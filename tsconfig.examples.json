@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "paths": {
+      "mobxstate": ["./src/index.ts"]
+    }
+  },
+  "include": ["examples/standalone/**/*.ts", "examples/live/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

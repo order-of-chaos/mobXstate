@@ -1,6 +1,6 @@
 # Releasing
 
-`mobxstate` uses Changesets for versioning, GitHub Actions for validation and release PR generation, GitHub Pages for the live site, and manual npm publish from a maintainer machine.
+`@orderofchaos/mobxstate` uses Changesets for versioning, GitHub Actions for validation and release PR generation, GitHub Pages for the live site, and manual npm publish from a maintainer machine.
 
 ## Responsibilities
 
@@ -11,7 +11,7 @@
 
 ## Who Can Publish
 
-Maintainers with npm publish access to the `mobxstate` package.
+Maintainers with npm publish access to the `@orderofchaos/mobxstate` package.
 
 ## Contributor Flow
 

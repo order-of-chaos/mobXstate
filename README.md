@@ -9,7 +9,7 @@ Stately or XState.
 ## Install
 
 ```sh
-npm install mobxstate mobx
+npm install @orderofchaos/mobxstate mobx
 ```
 
 ## Docs
@@ -32,7 +32,7 @@ package entrypoint that links readers to the stable public docs pages.
 import {
   MobXStateMachine,
   createMachine,
-} from "mobxstate";
+} from "@orderofchaos/mobxstate";
 
 type CounterEvent =
   | { type: "RESET" }

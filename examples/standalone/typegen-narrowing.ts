@@ -1,4 +1,4 @@
-import type { MachineOptions } from "mobxstate";
+import type { MachineOptions } from "@orderofchaos/mobxstate";
 
 type CheckoutEvent =
   | { type: "SELECT_TABLE"; payload: { bet: number } }

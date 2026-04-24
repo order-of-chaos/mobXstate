@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-npm install mobxstate mobx
+npm install @orderofchaos/mobxstate mobx
 ```
 
 ## Smallest Working Example
@@ -12,7 +12,7 @@ npm install mobxstate mobx
 import {
   MobXStateMachine,
   createMachine,
-} from "mobxstate";
+} from "@orderofchaos/mobxstate";
 
 type CounterEvent =
   | { type: "RESET" }

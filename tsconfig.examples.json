@@ -5,8 +5,9 @@
     "declaration": true,
     "emitDeclarationOnly": false,
     "noEmit": true,
+    "rootDir": ".",
     "paths": {
-      "mobxstate": ["./src/index.ts"]
+      "@orderofchaos/mobxstate": ["./src/index.ts"]
     }
   },
   "include": ["examples/standalone/**/*.ts", "examples/live/**/*.ts"],

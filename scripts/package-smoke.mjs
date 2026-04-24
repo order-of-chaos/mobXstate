@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const npmCache = path.join(os.tmpdir(), "mobxstate-package-smoke-npm-cache");
+const packageName = "@orderofchaos/mobxstate";
+const packageSlug = "orderofchaos-mobxstate";
+const npmCache = path.join(os.tmpdir(), `${packageSlug}-package-smoke-npm-cache`);
 
 const run = (command, args, options = {}) => {
   const { env: extraEnv, ...spawnOptions } = options;
@@ -106,8 +108,8 @@ const writeConsumerProject = async (consumerRoot, tarballPath) => {
         private: true,
         type: "module",
         dependencies: {
+          [packageName]: fileDependency(tarballPath),
           mobx: fileDependency(path.join(repoRoot, "node_modules", "mobx")),
-          mobxstate: fileDependency(tarballPath),
           "ts-pattern": fileDependency(
             path.join(repoRoot, "node_modules", "ts-pattern"),
           ),
@@ -123,7 +125,7 @@ const writeConsumerProject = async (consumerRoot, tarballPath) => {
 
   await fs.writeFile(
     path.join(consumerRoot, "esm.mjs"),
-    `import { MobXStateMachine, createMachine } from "mobxstate";
+    `import { MobXStateMachine, createMachine } from "${packageName}";
 
 const machine = createMachine({
   id: "esmSmoke",
@@ -163,7 +165,7 @@ if (!store.matches("idle") || store.count !== 2) {
 
   await fs.writeFile(
     path.join(consumerRoot, "cjs.cjs"),
-    `const { MobXStateMachine, createMachine } = require("mobxstate");
+    `const { MobXStateMachine, createMachine } = require("${packageName}");
 
 const machine = createMachine({
   id: "cjsSmoke",
@@ -213,7 +215,7 @@ class Store extends MobXStateMachine {
   createMachine,
   type MachineOptions,
   type MachineSendEvent,
-} from "mobxstate";
+} from "${packageName}";
 
 type SmokeEvent =
   | { type: "RESET" }
@@ -305,7 +307,7 @@ void removedServices;
 };
 
 const main = async () => {
-  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mobxstate-smoke-"));
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), `${packageSlug}-smoke-`));
   const consumerRoot = path.join(tempRoot, "consumer");
 
   try {
@@ -345,13 +347,18 @@ const main = async () => {
     );
 
     const installedPackage = await readJson(
-      path.join(consumerRoot, "node_modules", "mobxstate", "package.json"),
+      path.join(
+        consumerRoot,
+        "node_modules",
+        ...packageName.split("/"),
+        "package.json",
+      ),
     );
     if (
       installedPackage.dependencies?.xstate !== undefined ||
       installedPackage.peerDependencies?.xstate !== undefined
     ) {
-      throw new Error("mobxstate package metadata must not depend on xstate.");
+      throw new Error(`${packageName} package metadata must not depend on xstate.`);
     }
 
     if (

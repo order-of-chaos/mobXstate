@@ -2,7 +2,7 @@ import { makeObservable, observable } from "mobx";
 import {
   MobXStateMachine,
   createMachine,
-} from "mobxstate";
+} from "@orderofchaos/mobxstate";
 
 type LiveStreamEvent =
   | { type: "CONNECT" }

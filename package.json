@@ -1,5 +1,5 @@
 {
-  "name": "mobxstate",
+  "name": "@orderofchaos/mobxstate",
   "version": "0.0.1",
   "description": "Statechart-shaped finite state machines for MobX stores with Stately-friendly configs and no separate machine context.",
   "type": "module",

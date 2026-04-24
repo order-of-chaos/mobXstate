@@ -3,7 +3,7 @@ import {
   MobXStateMachine,
   createMachine,
   type DoneInvokeEvent,
-} from "mobxstate";
+} from "@orderofchaos/mobxstate";
 
 interface User {
   id: string;

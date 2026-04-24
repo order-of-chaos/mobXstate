@@ -12,7 +12,6 @@ interface CheckoutTypegen {
     actions: "sitAtMoneyTable" | "submitPayment";
     delays: never;
     guards: never;
-    services: never;
   };
   eventsCausingActions: {
     sitAtMoneyTable: "SELECT_TABLE";

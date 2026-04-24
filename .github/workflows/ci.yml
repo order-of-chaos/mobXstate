@@ -36,3 +36,6 @@ jobs:
 
       - name: Pack dry run
         run: npm run pack:dry-run
+
+      - name: Package smoke test
+        run: npm run smoke:package

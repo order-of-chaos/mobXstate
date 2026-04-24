@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   MobXStateMachine,
+  MachineCleanupError,
   createMachine,
   sendTo,
   type MachineOptions,
-  type Sender,
-} from "../BaseMachineState";
+} from "../MobXStateMachine";
 
 const flushPromises = async (): Promise<void> => {
   await new Promise((resolve) => {
@@ -178,24 +178,12 @@ const streamOptions: MachineOptions<StreamState, StreamEvent> = {
       }
     },
   },
-  services: {
-    streamConnection() {
-      return (send: Sender<StreamEvent>) => {
-        this.starts += 1;
-        this.sendFromStream = send;
-
-        return () => {
-          this.stops += 1;
-        };
-      };
-    },
-  },
 };
 
 class StreamState extends MobXStateMachine<StreamState, StreamEvent> {
   public messages: string[] = [];
 
-  public sendFromStream: Sender<StreamEvent> | undefined;
+  public sendFromStream: ((event: StreamEvent) => void) | undefined;
 
   public starts = 0;
 
@@ -204,13 +192,42 @@ class StreamState extends MobXStateMachine<StreamState, StreamEvent> {
   constructor() {
     super(streamMachine, streamOptions, { deferStart: false });
   }
+
+  public streamConnection(): () => void {
+    this.starts += 1;
+    this.sendFromStream = (event) => {
+      this.send(event);
+    };
+
+    return () => {
+      this.stops += 1;
+    };
+  }
 }
 
 type ChannelEvent =
   | { type: "OPEN" }
   | { type: "PING_CHILD" }
-  | { type: "CHILD_ACK" }
   | { type: "CLOSE" };
+
+const channelChildMachine = createMachine<{ type: "PING_CHILD" }>({
+  id: "channelChild",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as { type: "PING_CHILD" },
+  },
+  initial: "waiting",
+  states: {
+    waiting: {
+      on: {
+        PING_CHILD: "done",
+      },
+    },
+    done: {
+      type: "final",
+    },
+  },
+});
 
 const channelMachine = createMachine<ChannelEvent>({
   id: "channel",
@@ -229,6 +246,9 @@ const channelMachine = createMachine<ChannelEvent>({
       invoke: {
         id: "channelConnection",
         src: "channelConnection",
+        onDone: {
+          actions: "recordAck",
+        },
       },
       on: {
         PING_CHILD: {
@@ -236,9 +256,6 @@ const channelMachine = createMachine<ChannelEvent>({
             { type: "PING_CHILD" },
             { to: "channelConnection" },
           ),
-        },
-        CHILD_ACK: {
-          actions: "recordAck",
         },
         CLOSE: "closed",
       },
@@ -253,17 +270,6 @@ const channelOptions: MachineOptions<ChannelState, ChannelEvent> = {
       this.acks += 1;
     },
   },
-  services: {
-    channelConnection() {
-      return (send, onReceive) => {
-        onReceive((event) => {
-          if (event.type === "PING_CHILD") {
-            send({ type: "CHILD_ACK" });
-          }
-        });
-      };
-    },
-  },
 };
 
 class ChannelState extends MobXStateMachine<ChannelState, ChannelEvent> {
@@ -271,6 +277,10 @@ class ChannelState extends MobXStateMachine<ChannelState, ChannelEvent> {
 
   constructor() {
     super(channelMachine, channelOptions, { deferStart: false });
+  }
+
+  public channelConnection(): typeof channelChildMachine {
+    return channelChildMachine;
   }
 }
 
@@ -331,11 +341,6 @@ const parentFlowOptions: MachineOptions<ParentFlowState, ParentFlowEvent> = {
       this.completed += 1;
     },
   },
-  services: {
-    childFlow() {
-      return childFlowMachine;
-    },
-  },
 };
 
 class ParentFlowState extends MobXStateMachine<
@@ -346,6 +351,10 @@ class ParentFlowState extends MobXStateMachine<
 
   constructor() {
     super(parentFlowMachine, parentFlowOptions, { deferStart: false });
+  }
+
+  public childFlow(): typeof childFlowMachine {
+    return childFlowMachine;
   }
 }
 
@@ -391,7 +400,7 @@ const failingOptions: MachineOptions<FailingState, FailingEvent> = {
       }
     },
   },
-  services: {
+  effects: {
     fetchValue() {
       return Promise.reject(this.reason);
     },
@@ -403,6 +412,302 @@ class FailingState extends MobXStateMachine<FailingState, FailingEvent> {
 
   constructor(public readonly reason: Error) {
     super(failingMachine, failingOptions, { deferStart: false });
+  }
+}
+
+type SyncEffectEvent =
+  | { type: "START" }
+  | { type: "error.platform.syncLoad"; data: unknown };
+
+const syncEffectMachine = createMachine<SyncEffectEvent>({
+  id: "syncEffect",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as SyncEffectEvent,
+  },
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        START: "loading",
+      },
+    },
+    loading: {
+      invoke: {
+        id: "syncLoad",
+        src: "syncLoad",
+        onError: {
+          target: "failure",
+          actions: "recordError",
+        },
+      },
+    },
+    failure: {},
+  },
+});
+
+const optionsSyncEffectOptions: MachineOptions<
+  OptionsSyncEffectState,
+  SyncEffectEvent
+> = {
+  actions: {
+    recordError(event) {
+      if (event.type === "error.platform.syncLoad") {
+        this.error = event.data instanceof Error ? event.data.message : "error";
+      }
+    },
+  },
+  effects: {
+    syncLoad() {
+      throw this.reason;
+    },
+  },
+};
+
+class StoreSyncEffectState extends MobXStateMachine<
+  StoreSyncEffectState,
+  SyncEffectEvent
+> {
+  public error = "";
+
+  public reason = new Error("store failed");
+
+  constructor() {
+    super(syncEffectMachine, { deferStart: false });
+  }
+
+  public syncLoad(): void {
+    throw this.reason;
+  }
+
+  public recordError(event: SyncEffectEvent): void {
+    if (event.type === "error.platform.syncLoad") {
+      this.error = event.data instanceof Error ? event.data.message : "error";
+    }
+  }
+}
+
+class OptionsSyncEffectState extends MobXStateMachine<
+  OptionsSyncEffectState,
+  SyncEffectEvent
+> {
+  public error = "";
+
+  public reason = new Error("options failed");
+
+  constructor() {
+    super(syncEffectMachine, optionsSyncEffectOptions, { deferStart: false });
+  }
+}
+
+type InvalidEffectReturnEvent = { type: "RESET" };
+
+const invalidEffectReturnMachine = createMachine<InvalidEffectReturnEvent>({
+  id: "invalidEffectReturn",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as InvalidEffectReturnEvent,
+  },
+  initial: "loading",
+  states: {
+    loading: {
+      invoke: "load",
+    },
+  },
+});
+
+class InvalidEffectReturnState extends MobXStateMachine<
+  InvalidEffectReturnState,
+  InvalidEffectReturnEvent
+> {
+  constructor() {
+    super(invalidEffectReturnMachine, {
+      stopped: true,
+      deferStart: false,
+      strict: true,
+    });
+  }
+
+  public load(): unknown {
+    return { value: "unsupported" };
+  }
+}
+
+type CancelPromiseEvent =
+  | { type: "START" }
+  | { type: "CANCEL" }
+  | { type: "done.invoke.load"; data: string };
+
+const cancelPromiseMachine = createMachine<CancelPromiseEvent>({
+  id: "cancelPromise",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as CancelPromiseEvent,
+  },
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        START: "loading",
+      },
+    },
+    loading: {
+      invoke: {
+        id: "load",
+        src: "load",
+        onDone: "success",
+      },
+      on: {
+        CANCEL: "idle",
+      },
+    },
+    success: {},
+  },
+});
+
+class CancelPromiseState extends MobXStateMachine<
+  CancelPromiseState,
+  CancelPromiseEvent
+> {
+  public resolveLoad: ((value: string) => void) | undefined;
+
+  constructor() {
+    super(cancelPromiseMachine, {
+      stopped: true,
+      deferStart: false,
+      strict: true,
+    });
+  }
+
+  public load(): Promise<string> {
+    return new Promise((resolve) => {
+      this.resolveLoad = resolve;
+    });
+  }
+}
+
+type ThrowingActionEvent = { type: "GO" } | { type: "AFTER" };
+
+const throwingActionMachine = createMachine<ThrowingActionEvent>({
+  id: "throwingAction",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as ThrowingActionEvent,
+  },
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        GO: {
+          actions: "explode",
+        },
+        AFTER: "done",
+      },
+    },
+    done: {},
+  },
+});
+
+class ThrowingActionState extends MobXStateMachine<
+  ThrowingActionState,
+  ThrowingActionEvent
+> {
+  constructor() {
+    super(throwingActionMachine, { deferStart: false });
+  }
+
+  public explode(): void {
+    throw new Error("action failed");
+  }
+}
+
+type ThrowingGuardEvent = { type: "GO" } | { type: "AFTER" };
+
+const throwingGuardMachine = createMachine<ThrowingGuardEvent>({
+  id: "throwingGuard",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as ThrowingGuardEvent,
+  },
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        GO: {
+          target: "done",
+          cond: "canGo",
+        },
+        AFTER: "done",
+      },
+    },
+    done: {},
+  },
+});
+
+class ThrowingGuardState extends MobXStateMachine<
+  ThrowingGuardState,
+  ThrowingGuardEvent
+> {
+  constructor() {
+    super(throwingGuardMachine, { deferStart: false });
+  }
+
+  public canGo(): boolean {
+    throw new Error("guard failed");
+  }
+}
+
+type CleanupErrorEvent = { type: "STOP" };
+
+const cleanupErrorMachine = createMachine<CleanupErrorEvent>({
+  id: "cleanupError",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as CleanupErrorEvent,
+  },
+  initial: "active",
+  states: {
+    active: {
+      invoke: [
+        {
+          id: "first",
+          src: "first",
+        },
+        {
+          id: "second",
+          src: "second",
+        },
+      ],
+      on: {
+        STOP: "done",
+      },
+    },
+    done: {},
+  },
+});
+
+class CleanupErrorState extends MobXStateMachine<
+  CleanupErrorState,
+  CleanupErrorEvent
+> {
+  public cleanups: string[] = [];
+
+  constructor() {
+    super(cleanupErrorMachine, { deferStart: false, strict: true });
+  }
+
+  public first(): () => void {
+    return () => {
+      this.cleanups.push("first");
+      throw new Error("first cleanup failed");
+    };
+  }
+
+  public second(): () => void {
+    return () => {
+      this.cleanups.push("second");
+      throw new Error("second cleanup failed");
+    };
   }
 }
 
@@ -579,7 +884,7 @@ describe("MobXStateMachine advanced XState behavior", () => {
     expect(machine.log).toEqual(["entry", "ping", "exit", "entry"]);
   });
 
-  it("runs callback invokes and their cleanup functions", async () => {
+  it("runs invoke effects and their cleanup functions", async () => {
     const stream = new StreamState();
 
     await stream.ready;
@@ -593,7 +898,7 @@ describe("MobXStateMachine advanced XState behavior", () => {
     expect(stream.matches("closed")).toBe(true);
   });
 
-  it("lets callback invokes receive events sent to the child actor", async () => {
+  it("lets invoked child machines receive events sent to the child actor", async () => {
     const channel = new ChannelState();
 
     await channel.ready;
@@ -623,6 +928,116 @@ describe("MobXStateMachine advanced XState behavior", () => {
 
     expect(failing.matches("failure")).toBe(true);
     expect(failing.error).toBe("network");
+  });
+
+  it("routes synchronous store effect errors through onError", async () => {
+    const failing = new StoreSyncEffectState();
+
+    await failing.ready;
+
+    expect(() => failing.send({ type: "START" })).not.toThrow();
+    expect(failing.matches("failure")).toBe(true);
+    expect(failing.error).toBe("store failed");
+  });
+
+  it("routes synchronous MachineOptions.effects errors through onError", async () => {
+    const failing = new OptionsSyncEffectState();
+
+    await failing.ready;
+
+    expect(() => failing.send({ type: "START" })).not.toThrow();
+    expect(failing.matches("failure")).toBe(true);
+    expect(failing.error).toBe("options failed");
+  });
+
+  it("throws strict errors for invalid effect return values", async () => {
+    const machine = new InvalidEffectReturnState();
+
+    await expect(machine.startMachine()).rejects.toThrow(
+      'Invalid effect return value from "load"',
+    );
+  });
+
+  it("ignores promise resolutions after the invoking state exits", async () => {
+    const machine = new CancelPromiseState();
+
+    await machine.startMachine();
+    machine.send({ type: "START" });
+    expect(machine.matches("loading")).toBe(true);
+
+    machine.send({ type: "CANCEL" });
+    machine.resolveLoad?.("late");
+    await flushPromises();
+
+    expect(machine.matches("idle")).toBe(true);
+  });
+
+  it("treats action errors as fatal runtime errors", async () => {
+    const machine = new ThrowingActionState();
+
+    await machine.ready;
+
+    expect(() => machine.send({ type: "GO" })).toThrow("action failed");
+
+    machine.send({ type: "AFTER" });
+
+    expect(machine.matches("idle")).toBe(true);
+  });
+
+  it("treats guard errors as fatal runtime errors", async () => {
+    const machine = new ThrowingGuardState();
+
+    await machine.ready;
+
+    expect(() => machine.send({ type: "GO" })).toThrow("guard failed");
+
+    machine.send({ type: "AFTER" });
+
+    expect(machine.matches("idle")).toBe(true);
+  });
+
+  it("aggregates cleanup errors and still runs every cleanup", async () => {
+    const machine = new CleanupErrorState();
+    let thrown: unknown;
+
+    await machine.ready;
+
+    try {
+      machine.send({ type: "STOP" });
+    } catch (error) {
+      thrown = error;
+    }
+
+    if (!(thrown instanceof MachineCleanupError)) {
+      throw new Error("Expected cleanup aggregation error.");
+    }
+
+    expect(machine.cleanups).toEqual(["first", "second"]);
+    expect(thrown.errors).toHaveLength(2);
+  });
+
+  it("aggregates cleanup and disposer errors on stopMachine", async () => {
+    const machine = new CleanupErrorState();
+    let thrown: unknown;
+
+    await machine.ready;
+    machine.addDisposer(() => {
+      machine.cleanups.push("disposer");
+      throw new Error("disposer failed");
+    });
+
+    try {
+      machine.stopMachine();
+    } catch (error) {
+      thrown = error;
+    }
+
+    if (!(thrown instanceof MachineCleanupError)) {
+      throw new Error("Expected cleanup aggregation error.");
+    }
+
+    expect(machine.cleanups).toEqual(["first", "second", "disposer"]);
+    expect(thrown.errors).toHaveLength(3);
   });
 
   it("cancels delayed transitions when the source state exits", async () => {

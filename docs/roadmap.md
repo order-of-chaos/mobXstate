@@ -12,27 +12,24 @@ This roadmap keeps the library focused on a MobX-first statechart model:
 Goal: make the happy path small, consistent and explainable before the first npm
 release.
 
-- Use `effects` as the public name for invoke fallbacks.
-- Keep `MachineOptions.services` as a deprecated alias for callback-style
-  migrations.
-- Remove `activities` from documentation and examples.
-- Keep `activities` as deprecated compatibility or remove it before the first
-  public release.
+- Use `effects` as the public name for invoke fallbacks. Done.
+- Remove `MachineOptions.services` and callback-style invoke services. Done.
+- Remove `MachineOptions.activities` and state node `activities`. Done.
 - Update docs to use `statechart-shaped` and `Stately-compatible` wording
-  instead of implying an XState runtime dependency.
+  instead of implying an XState runtime dependency. Done.
 - Add a feature support table:
   - supported: `entry`, `exit`, named actions, guards, delays, `after`,
     `always`, `invoke`, promise effects, cleanup effects, child machines,
     parallel states, final states, shallow history;
-  - deprecated: `services`, `activities`;
+  - removed: `services`, `activities`;
   - unsupported or explicit error: deep history, advanced XState-only runtime
-    features.
+    features. Done.
 
 Done when:
 
 - the README shows only store methods/getters/effects in primary examples;
-- deprecated APIs are clearly marked;
-- no example uses `activities`;
+- removed APIs are documented as removed;
+- no example uses `services` or `activities`;
 - package wording does not imply `xstate` is a dependency.
 
 ## Phase 2: Strict Runtime Validation
@@ -52,11 +49,12 @@ Goal: fail early with clear errors when a machine config cannot run correctly.
   - missing action method or fallback action;
   - missing guard getter/method/property or fallback guard;
   - missing delay getter/method/property or fallback delay;
-  - missing effect method or fallback effect/service;
-  - missing cleanup/effect shape when invalid values are returned.
+  - missing effect method or fallback effect;
+  - missing cleanup/effect shape when invalid values are returned. Done for
+    strict invoke effects.
 - Add `strict?: boolean` to `MachineStateConfig`. Done.
-- Decide whether strict mode is default for development and opt-out for
-  migration.
+- Keep `strict: false` as the first-release default and recommend `strict: true`
+  for new code in docs.
 
 Done when:
 
@@ -68,15 +66,14 @@ Done when:
 
 Goal: catch common mistakes at compile time.
 
-- Make `send` payload-aware:
+- Make `send` payload-aware. Done:
   - object events always work;
-  - string events are allowed only for event variants without extra payload.
-- Add type tests for string `send`.
+  - string events are allowed only for event variants without required payload.
+- Add type tests for string `send`. Done.
 - Explore store-method type helpers so action names can receive narrowed event
   types without relying only on `MachineOptions`.
 - Keep typegen-aware `MachineOptions` while store-method typing matures.
-- Review public type names and remove legacy naming before the first stable
-  release.
+- Keep `MobXStateMachine` as the only public class name. Done.
 
 Done when:
 
@@ -88,19 +85,24 @@ Done when:
 
 Goal: make state transitions predictable under MobX and async effects.
 
-- Batch a full macrostep in one MobX transaction:
+- Batch a full macrostep in one MobX transaction. Done:
   `exit -> transition actions -> entry -> snapshot publish`.
 - Define error behavior:
-  - action throws;
-  - guard throws;
-  - effect throws synchronously;
-  - cleanup throws;
-  - promise rejects after cancellation.
+  - action throws. Done: actor stops, resources clean up, original error is
+    rethrown;
+  - guard throws. Done: actor stops, resources clean up, original error is
+    rethrown;
+  - effect throws synchronously. Done for invoked effects via `onError`;
+  - cleanup throws. Done: all cleanups are attempted and failures are reported
+    as `MachineCleanupError`;
+  - promise rejects after cancellation. Done for invoked promises.
 - For invoked effects, route synchronous errors into `onError` when possible.
-- Validate persisted state before restore.
-- Add persistence versioning and optional migration:
+  Done.
+- Validate persisted state before restore. Done: stale, nested-invalid and
+  incomplete parallel values fall back to initial state.
+- Add persistence versioning and optional restore transforms. Done:
   - `version`;
-  - `migrate`;
+  - `transformPersistedState`;
   - fallback to initial state on invalid saved data.
 
 Done when:
@@ -114,31 +116,32 @@ Done when:
 Goal: make the package reliable for real consumers.
 
 - Add package smoke tests:
-  - `npm pack`;
-  - install tarball into a temp project;
-  - ESM import;
-  - CJS require;
-  - TypeScript type import;
-  - verify no `xstate` dependency.
-- Add `repository`, `bugs` and `homepage` metadata.
+  - `npm pack`. Done;
+  - install tarball into a temp project. Done;
+  - ESM import. Done;
+  - CJS require. Done;
+  - TypeScript type import. Done;
+  - verify no `xstate` dependency. Done.
+- Add `repository`, `bugs` and `homepage` metadata. Done; verify the final
+  GitHub URL before publish.
 - Reconsider package keywords:
   - keep `stately` and `statechart`;
   - use `xstate` only if compatibility wording is clear.
-- Confirm `mobx` remains a peer dependency and a dev/test dependency.
-- Document supported Node and TypeScript versions.
+- Confirm `mobx` remains a peer dependency and a dev/test dependency. Done.
+- Document supported Node and TypeScript versions. Done.
 
 Done when:
 
-- CI proves the packed package works outside this repo;
+- CI proves the packed package works outside this repo. Done;
 - npm metadata is complete;
 - release docs describe exactly what is supported.
 
 ## Recommended Next Step
 
-Start with Phase 1 and Phase 2 together:
+Before publishing:
 
-1. Validate invalid effect return values and define sync error behavior.
-2. Harden effect cancellation.
-3. Add stronger `send` typing.
+1. Decide whether the `xstate` keyword should stay for Stately discoverability
+   or be removed to avoid compatibility confusion.
+2. Explore store-method type helpers after the package release path is stable.
 
-That gives the largest practical improvement before adding more surface area.
+That keeps the first npm release focused on a stable install and import story.

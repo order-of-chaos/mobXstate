@@ -6,26 +6,19 @@ import type {
   MachineAction,
   MachineActionObject,
   MachineActionReference,
-  MachineActivity,
-  MachineActivityDefinition,
   MachineCondition,
   MachineDelay,
   MachineDelayTransition,
   MachineEffect,
-  MachineEffectReturn,
   MachineGuard,
-  MachineInvokeCallback,
   MachineInvokeConfig,
   MachineOptions,
-  MachineService,
-  MachineServiceReturn,
+  MachineSendEvent,
   MachineStateNodeConfig,
   MachineStateValue,
   MachineTransition,
   MachineTransitionConfig,
-  Receiver,
   RuntimeMachine,
-  Sender,
   TypegenConstraint,
   TypegenDisabled,
 } from "./stateMachine";
@@ -42,13 +35,21 @@ export interface MachineSnapshot<Event extends EventObject> {
   matches(state: MachineStateValue): boolean;
 }
 
+export class MachineCleanupError extends Error {
+  public readonly errors: readonly unknown[];
+
+  constructor(message: string, errors: readonly unknown[]) {
+    super(message);
+    this.name = "MachineCleanupError";
+    this.errors = [...errors];
+  }
+}
+
 type RuntimeOptions<Scope extends object, Event extends EventObject> = {
   actions?: Record<string, MachineAction<Scope, Event>>;
   guards?: Record<string, MachineGuard<Scope, Event>>;
   effects?: Record<string, MachineEffect<Scope, Event>>;
-  services?: Record<string, MachineService<Scope, Event, Event>>;
   delays?: Record<string, MachineDelay<Scope, Event>>;
-  activities?: Record<string, MachineActivity<Scope>>;
 };
 
 export interface MachineActorConfig {
@@ -88,7 +89,6 @@ interface InvokeActor<Event extends EventObject> {
 
 interface NodeEffects<Event extends EventObject> {
   readonly timers: Set<ReturnType<typeof setTimeout>>;
-  readonly activities: Array<() => void>;
   readonly invokes: Map<string, InvokeActor<Event>>;
 }
 
@@ -183,16 +183,6 @@ const findPropertyDescriptor = (
 const normalizeActionReferences = (
   value: MachineActionReference | undefined,
 ): Array<string | MachineActionObject> => {
-  if (!value) {
-    return [];
-  }
-
-  return Array.isArray(value) ? value : [value];
-};
-
-const normalizeActivities = (
-  value: MachineStateNodeConfig<EventObject>["activities"],
-): Array<string | MachineActivityDefinition> => {
   if (!value) {
     return [];
   }
@@ -566,8 +556,7 @@ export class MachineActor<
   private hasEffectImplementation = (name: string): boolean => {
     return (
       this.hasCallableScopeMember(name) ||
-      this.options.effects?.[name] !== undefined ||
-      this.options.services?.[name] !== undefined
+      this.options.effects?.[name] !== undefined
     );
   };
 
@@ -628,6 +617,10 @@ export class MachineActor<
     };
   };
 
+  public canRestoreStateValue = (value: MachineStateValue): boolean => {
+    return this.getLeafPathsFromValue(this.root, value) !== undefined;
+  };
+
   public start = (value?: MachineStateValue): MachineActorStatus => {
     if (this.status === MachineActorStatus.Running) {
       return this.status;
@@ -642,14 +635,21 @@ export class MachineActor<
 
     const initEvent = eventFromType<Event>("xstate.init");
     this.processing = true;
-    this.enterNode(this.root, initEvent);
-    this.getEntryNodes([], this.activePaths).forEach((node) => {
-      this.enterNode(node, initEvent);
-    });
-    this.processStableTransitions(initEvent);
-    this.publish(initEvent);
-    this.processing = false;
-    this.flushQueue();
+    try {
+      this.runMacrostep(() => {
+        this.enterNode(this.root, initEvent);
+        this.getEntryNodes([], this.activePaths).forEach((node) => {
+          this.enterNode(node, initEvent);
+        });
+        this.processStableTransitions(initEvent);
+        this.publish(initEvent);
+      });
+      this.processing = false;
+      this.flushQueue();
+    } catch (error) {
+      this.processing = false;
+      this.stopAfterRuntimeError(error);
+    }
 
     return this.status;
   };
@@ -660,16 +660,22 @@ export class MachineActor<
     }
 
     const stopEvent = eventFromType<Event>("xstate.stop");
-    this.getExitNodes(this.root, []).forEach((node) => {
-      this.exitNode(node, stopEvent);
-    });
-    this.exitNode(this.root, stopEvent);
-    this.activePaths = [];
-    this.status = MachineActorStatus.Stopped;
-    this.stopSubscribers.forEach((subscriber) => subscriber());
+    try {
+      this.runMacrostep(() => {
+        this.getExitNodes(this.root, []).forEach((node) => {
+          this.exitNode(node, stopEvent);
+        });
+        this.exitNode(this.root, stopEvent);
+        this.finishStop();
+      });
+    } catch (error) {
+      this.stopAllEffects();
+      this.finishStop();
+      throw error;
+    }
   };
 
-  public send = (event: Event | Event["type"]): void => {
+  public send = (event: MachineSendEvent<Event>): void => {
     if (this.status !== MachineActorStatus.Running) {
       return;
     }
@@ -681,9 +687,16 @@ export class MachineActor<
     }
 
     this.processing = true;
-    this.processQueuedEvent(normalizedEvent);
-    this.processing = false;
-    this.flushQueue();
+    try {
+      this.runMacrostep(() => {
+        this.processQueuedEvent(normalizedEvent);
+      });
+      this.processing = false;
+      this.flushQueue();
+    } catch (error) {
+      this.processing = false;
+      this.stopAfterRuntimeError(error);
+    }
   };
 
   private flushQueue = (): void => {
@@ -692,16 +705,59 @@ export class MachineActor<
     }
 
     this.processing = true;
-    while (
-      this.status === MachineActorStatus.Running &&
-      this.queue.length > 0
-    ) {
-      const event = this.queue.shift();
-      if (event) {
-        this.processQueuedEvent(event);
+    try {
+      while (
+        this.status === MachineActorStatus.Running &&
+        this.queue.length > 0
+      ) {
+        const event = this.queue.shift();
+        if (event) {
+          this.runMacrostep(() => {
+            this.processQueuedEvent(event);
+          });
+        }
+      }
+      this.processing = false;
+    } catch (error) {
+      this.processing = false;
+      this.stopAfterRuntimeError(error);
+    }
+  };
+
+  private runMacrostep = <Result>(run: () => Result): Result => {
+    return runInAction(run);
+  };
+
+  private stopAfterRuntimeError = (error: unknown): never => {
+    this.queue = [];
+
+    let cleanupError: MachineCleanupError | undefined;
+    try {
+      this.stopAllEffects();
+    } catch (stopError) {
+      if (stopError instanceof MachineCleanupError) {
+        cleanupError = stopError;
+      } else {
+        cleanupError = this.createCleanupError([stopError]);
       }
     }
-    this.processing = false;
+
+    this.finishStop();
+
+    if (cleanupError) {
+      throw new MachineCleanupError(
+        `State machine "${this.machine.id}" stopped after a runtime error, but cleanup also failed.`,
+        [error, ...cleanupError.errors],
+      );
+    }
+
+    throw error;
+  };
+
+  private finishStop = (): void => {
+    this.activePaths = [];
+    this.status = MachineActorStatus.Stopped;
+    this.stopSubscribers.forEach((subscriber) => subscriber());
   };
 
   private processQueuedEvent = (event: Event): void => {
@@ -959,9 +1015,10 @@ export class MachineActor<
 
   private enterNode = (node: RuntimeNode<Event>, event: Event): void => {
     this.executeActions(node.config.entry, event);
-    this.startActivities(node);
     this.startInvokes(node, event);
-    this.startDelayedTransitions(node, event);
+    if (this.status === MachineActorStatus.Running && this.isTransitionSourceActive(node)) {
+      this.startDelayedTransitions(node, event);
+    }
   };
 
   private exitNode = (node: RuntimeNode<Event>, event: Event): void => {
@@ -1031,7 +1088,7 @@ export class MachineActor<
     const event = isActionObject(action.event)
       ? this.toEvent(action.event as unknown as Event)
       : typeof action.event === "string"
-        ? this.toEvent(action.event)
+        ? eventFromType<Event>(action.event)
         : currentEvent;
 
     if (typeof action.to === "string") {
@@ -1098,49 +1155,6 @@ export class MachineActor<
     ).get();
   };
 
-  private startActivities = (node: RuntimeNode<Event>): void => {
-    if (!this.scope) {
-      return;
-    }
-
-    const scope = this.scope;
-
-    normalizeActivities(
-      node.config.activities as MachineStateNodeConfig<EventObject>["activities"],
-    ).forEach((activity) => {
-      const definition =
-        typeof activity === "string" ? { type: activity } : activity;
-      const storeActivity = this.getScopeMember(definition.type);
-      if (isCallable(storeActivity)) {
-        const cleanup = runInAction(() => {
-          return storeActivity.call(scope, definition);
-        });
-
-        if (isCallable(cleanup)) {
-          this.getEffects(node).activities.push(() => {
-            runInAction(() => {
-              cleanup();
-            });
-          });
-        }
-        return;
-      }
-
-      const implementation = this.options.activities?.[definition.type];
-      const cleanup = runInAction(() => {
-        return implementation?.call(scope, definition);
-      });
-
-      if (cleanup) {
-        this.getEffects(node).activities.push(() => {
-          runInAction(() => {
-            cleanup();
-          });
-        });
-      }
-    });
-  };
-
   private startDelayedTransitions = (
     node: RuntimeNode<Event>,
     event: Event,
@@ -1166,10 +1180,17 @@ export class MachineActor<
 
         if (picked) {
           this.processing = true;
-          this.executeTransition(node, picked.transition, delayedEvent);
-          this.processStableTransitions(delayedEvent);
-          this.processing = false;
-          this.flushQueue();
+          try {
+            this.runMacrostep(() => {
+              this.executeTransition(node, picked.transition, delayedEvent);
+              this.processStableTransitions(delayedEvent);
+            });
+            this.processing = false;
+            this.flushQueue();
+          } catch (error) {
+            this.processing = false;
+            this.stopAfterRuntimeError(error);
+          }
         }
       }, delay);
 
@@ -1256,41 +1277,48 @@ export class MachineActor<
     const storeEffect = this.getScopeMember(invokeConfig.src);
 
     if (isCallable(storeEffect)) {
-      const result = runInAction(() => {
+      return this.createEffectActorFromResult(node, id, invokeConfig, () => {
         return storeEffect.call(scope, event, {
           src: invokeConfig.src,
         });
-      }) as MachineEffectReturn;
-
-      return this.resolveEffectResult(node, id, invokeConfig, result);
+      });
     }
 
     const effect = this.options.effects?.[invokeConfig.src];
     if (effect) {
-      const result = runInAction(() => effect.call(scope, event, {
-        src: invokeConfig.src,
-      }));
-
-      return this.resolveEffectResult(node, id, invokeConfig, result);
+      return this.createEffectActorFromResult(node, id, invokeConfig, () => {
+        return effect.call(scope, event, {
+          src: invokeConfig.src,
+        });
+      });
     }
 
-    const service = this.options.services?.[invokeConfig.src];
-    if (!service) {
+    return undefined;
+  };
+
+  private createEffectActorFromResult = (
+    node: RuntimeNode<Event>,
+    id: string,
+    invokeConfig: MachineInvokeConfig<Event>,
+    run: () => unknown,
+  ): InvokeActor<Event> | undefined => {
+    let result: unknown;
+
+    try {
+      result = runInAction(run);
+    } catch (error) {
+      this.handleInvokeError(node, invokeConfig, id, error);
       return undefined;
     }
 
-    const result = runInAction(() => service.call(scope, event, {
-      src: invokeConfig.src,
-    }));
-
-    return this.resolveServiceResult(node, id, invokeConfig, result);
+    return this.resolveEffectResult(node, id, invokeConfig, result);
   };
 
   private resolveEffectResult = (
     node: RuntimeNode<Event>,
     id: string,
     invokeConfig: MachineInvokeConfig<Event>,
-    result: MachineEffectReturn,
+    result: unknown,
   ): InvokeActor<Event> | undefined => {
     if (isPromiseLike(result)) {
       let active = true;
@@ -1342,92 +1370,20 @@ export class MachineActor<
       };
     }
 
-    return undefined;
-  };
-
-  private resolveServiceResult = (
-    node: RuntimeNode<Event>,
-    id: string,
-    invokeConfig: MachineInvokeConfig<Event>,
-    result: MachineServiceReturn<Event, Event>,
-  ): InvokeActor<Event> | undefined => {
-    if (isPromiseLike(result)) {
-      let active = true;
-
-      result.then(
-        (data) => {
-          if (active && this.isTransitionSourceActive(node)) {
-            this.handleInvokeDone(node, invokeConfig, id, data);
-          }
-        },
-        (error) => {
-          if (active && this.isTransitionSourceActive(node)) {
-            this.handleInvokeError(node, invokeConfig, id, error);
-          }
-        },
-      );
-
-      return {
-        id,
-        autoForward: invokeConfig.autoForward ?? false,
-        send: () => undefined,
-        stop: () => {
-          active = false;
-        },
-      };
-    }
-
-    if (isRuntimeMachine(result)) {
-      return this.createInvokedMachineActor(
-        id,
-        result,
-        invokeConfig.autoForward,
-        (doneEvent) => {
-          this.handleInvokeDone(node, invokeConfig, id, doneEvent);
-        },
-      );
-    }
-
-    if (typeof result === "function") {
-      return this.createCallbackInvokeActor(id, invokeConfig, result);
+    if (result !== undefined && this.config.strict === true) {
+      this.throwInvalidInvokeReturn(invokeConfig.src, node);
     }
 
     return undefined;
   };
 
-  private createCallbackInvokeActor = (
-    id: string,
-    invokeConfig: MachineInvokeConfig<Event>,
-    callback: MachineInvokeCallback<Event, Event>,
-  ): InvokeActor<Event> => {
-    const receivers: Array<(event: Event) => void> = [];
-    const sendBack: Sender<Event> = (event) => {
-      this.send(event);
-    };
-    const receive: Receiver<Event> = (receiver) => {
-      receivers.push(receiver);
-    };
-    const cleanup = runInAction(() => callback(sendBack, receive));
-
-    return {
-      id,
-      autoForward: invokeConfig.autoForward ?? false,
-      send: (event) => {
-        receivers.forEach((receiver) => {
-          runInAction(() => {
-            receiver(event);
-          });
-        });
-      },
-      stop: () => {
-        if (cleanup) {
-          runInAction(() => {
-            cleanup();
-          });
-        }
-        receivers.length = 0;
-      },
-    };
+  private throwInvalidInvokeReturn = (
+    name: string,
+    source: RuntimeNode<Event>,
+  ): never => {
+    throw new Error(
+      `Invalid effect return value from "${name}" in state "${this.formatNodePath(source)}" of machine "${this.machine.id}". Expected void, cleanup function, promise-like object or child machine.`,
+    );
   };
 
   private createInvokedMachineActor = (
@@ -1467,14 +1423,21 @@ export class MachineActor<
     const transition = this.pickTransition(invokeConfig.onDone, event);
 
     this.processing = true;
-    if (transition && this.isTransitionSourceActive(node)) {
-      this.executeTransition(node, transition.transition, event);
-    } else {
-      this.send(event);
+    try {
+      this.runMacrostep(() => {
+        if (transition && this.isTransitionSourceActive(node)) {
+          this.executeTransition(node, transition.transition, event);
+        } else {
+          this.send(event);
+        }
+        this.processStableTransitions(event);
+      });
+      this.processing = false;
+      this.flushQueue();
+    } catch (error) {
+      this.processing = false;
+      this.stopAfterRuntimeError(error);
     }
-    this.processStableTransitions(event);
-    this.processing = false;
-    this.flushQueue();
   };
 
   private handleInvokeError = (
@@ -1487,14 +1450,21 @@ export class MachineActor<
     const transition = this.pickTransition(invokeConfig.onError, event);
 
     this.processing = true;
-    if (transition && this.isTransitionSourceActive(node)) {
-      this.executeTransition(node, transition.transition, event);
-    } else {
-      this.send(event);
+    try {
+      this.runMacrostep(() => {
+        if (transition && this.isTransitionSourceActive(node)) {
+          this.executeTransition(node, transition.transition, event);
+        } else {
+          this.send(event);
+        }
+        this.processStableTransitions(event);
+      });
+      this.processing = false;
+      this.flushQueue();
+    } catch (error) {
+      this.processing = false;
+      this.stopAfterRuntimeError(error);
     }
-    this.processStableTransitions(event);
-    this.processing = false;
-    this.flushQueue();
   };
 
   private sendToInvoke = (id: string, event: Event): void => {
@@ -1519,10 +1489,61 @@ export class MachineActor<
       return;
     }
 
+    const errors: unknown[] = [];
     effects.timers.forEach((timer) => clearTimeout(timer));
-    effects.activities.forEach((cleanup) => cleanup());
-    effects.invokes.forEach((actor) => actor.stop());
+    effects.invokes.forEach((actor) => {
+      this.collectCleanupError(errors, () => {
+        actor.stop();
+      });
+    });
     this.effects.delete(pathKey(node.path));
+
+    if (errors.length > 0) {
+      throw this.createCleanupError(errors);
+    }
+  };
+
+  private stopAllEffects = (): void => {
+    const errors: unknown[] = [];
+
+    Array.from(this.effects.keys()).forEach((key) => {
+      const effects = this.effects.get(key);
+      if (!effects) {
+        return;
+      }
+
+      effects.timers.forEach((timer) => clearTimeout(timer));
+      effects.invokes.forEach((actor) => {
+        this.collectCleanupError(errors, () => {
+          actor.stop();
+        });
+      });
+      this.effects.delete(key);
+    });
+
+    if (errors.length > 0) {
+      throw this.createCleanupError(errors);
+    }
+  };
+
+  private collectCleanupError = (
+    errors: unknown[],
+    cleanup: () => void,
+  ): void => {
+    try {
+      cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  };
+
+  private createCleanupError = (
+    errors: readonly unknown[],
+  ): MachineCleanupError => {
+    return new MachineCleanupError(
+      `State machine "${this.machine.id}" cleanup failed with ${errors.length} error(s).`,
+      errors,
+    );
   };
 
   private getEffects = (node: RuntimeNode<Event>): NodeEffects<Event> => {
@@ -1534,7 +1555,6 @@ export class MachineActor<
 
     const effects: NodeEffects<Event> = {
       timers: new Set(),
-      activities: [],
       invokes: new Map(),
     };
     this.effects.set(key, effects);
@@ -1628,7 +1648,7 @@ export class MachineActor<
     const storedValue = this.history.get(pathKey(parent.path));
     if (storedValue !== undefined) {
       const restored = this.getLeafPathsFromValue(parent, storedValue);
-      if (restored.length > 0) {
+      if (restored) {
         return restored;
       }
     }
@@ -1644,7 +1664,7 @@ export class MachineActor<
     }
 
     const restored = this.getLeafPathsFromValue(this.root, value);
-    return restored.length > 0 ? restored : this.getInitialLeafPaths(this.root);
+    return restored ?? this.getInitialLeafPaths(this.root);
   };
 
   private getInitialLeafPaths = (node: RuntimeNode<Event>): string[][] => {
@@ -1675,30 +1695,76 @@ export class MachineActor<
   private getLeafPathsFromValue = (
     parent: RuntimeNode<Event>,
     value: MachineStateValue,
-  ): string[][] => {
+  ): string[][] | undefined => {
+    const stateChildren = Array.from(parent.children.values()).filter(
+      (child) => !isHistoryNode(child),
+    );
+
     if (typeof value === "string") {
-      const segments = value.split(".").filter(Boolean);
-      const directChild = parent.children.get(segments[0]);
-      if (!directChild) {
-        return [];
+      if (stateChildren.length === 0) {
+        return value === parent.key ? [parent.path] : undefined;
       }
 
-      if (segments.length === 1) {
-        return this.getInitialLeafPaths(directChild);
+      if (isParallelNode(parent)) {
+        return undefined;
+      }
+
+      const segments = value.split(".").filter(Boolean);
+      if (segments.length === 0) {
+        return undefined;
       }
 
       const node = this.nodes.get(pathKey([...parent.path, ...segments]));
-      return node ? this.getInitialLeafPaths(node) : [];
-    }
-
-    return Object.entries(value).flatMap(([key, childValue]) => {
-      const child = parent.children.get(key);
-      if (!child) {
-        return [];
+      if (!node || isHistoryNode(node)) {
+        return undefined;
       }
 
-      return this.getLeafPathsFromValue(child, childValue);
-    });
+      return this.getInitialLeafPaths(node);
+    }
+
+    if (stateChildren.length === 0) {
+      return undefined;
+    }
+
+    const entries = Object.entries(value);
+    const childrenByKey = new Map(
+      stateChildren.map((child) => [child.key, child]),
+    );
+
+    if (isParallelNode(parent)) {
+      if (entries.length !== stateChildren.length) {
+        return undefined;
+      }
+
+      const paths: string[][] = [];
+      for (const [key, childValue] of entries) {
+        const child = childrenByKey.get(key);
+        if (!child) {
+          return undefined;
+        }
+
+        const childPaths = this.getLeafPathsFromValue(child, childValue);
+        if (!childPaths) {
+          return undefined;
+        }
+
+        paths.push(...childPaths);
+      }
+
+      return paths;
+    }
+
+    if (entries.length !== 1) {
+      return undefined;
+    }
+
+    const [[key, childValue]] = entries;
+    const child = childrenByKey.get(key);
+    if (!child) {
+      return undefined;
+    }
+
+    return this.getLeafPathsFromValue(child, childValue);
   };
 
   private isTransitionSourceActive = (node: RuntimeNode<Event>): boolean => {
@@ -1828,7 +1894,7 @@ export class MachineActor<
     return (this.scope as Record<string, unknown>)[name];
   };
 
-  private toEvent = (event: Event | Event["type"]): Event => {
+  private toEvent = (event: MachineSendEvent<Event>): Event => {
     return typeof event === "string" ? eventFromType(event) : event;
   };
 }

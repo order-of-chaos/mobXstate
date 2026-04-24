@@ -4,11 +4,23 @@ export interface EventObject {
   type: string;
 }
 
-export type Sender<Event extends EventObject> = (event: Event) => void;
+export type EventType<Event extends EventObject> =
+  Event extends { type: infer Type extends string } ? Type : never;
 
-export type Receiver<Event extends EventObject> = (
-  listener: (event: Event) => void,
-) => void;
+type EventForType<
+  Event extends EventObject,
+  Type extends string,
+> = Extract<Event, { type: Type }>;
+
+export type PayloadlessEventType<Event extends EventObject> = {
+  [Type in EventType<Event>]: { type: Type } extends EventForType<Event, Type>
+    ? Type
+    : never;
+}[EventType<Event>];
+
+export type MachineSendEvent<Event extends EventObject> =
+  | Event
+  | PayloadlessEventType<Event>;
 
 export type MachineStateValue = string | { [key: string]: MachineStateValue };
 
@@ -78,8 +90,6 @@ export interface MachineEffectMeta {
   src: string;
 }
 
-export type MachineServiceMeta = MachineEffectMeta;
-
 export type MachineAction<
   Scope,
   Event extends EventObject,
@@ -107,42 +117,6 @@ export type MachineEffect<Scope, Event extends EventObject> = (
   event: Event,
   meta: MachineEffectMeta,
 ) => MachineEffectReturn;
-
-export type MachineServiceReturn<
-  Event extends EventObject,
-  SentEvent extends EventObject = Event,
-> =
-  | PromiseLike<unknown>
-  | RuntimeMachine
-  | MachineInvokeCallback<Event, SentEvent>
-  | void;
-
-export type MachineService<
-  Scope,
-  Event extends EventObject,
-  SentEvent extends EventObject = Event,
-> = (
-  this: Scope,
-  event: Event,
-  meta: MachineServiceMeta,
-) => MachineServiceReturn<Event, SentEvent>;
-
-export type MachineInvokeCallback<
-  Event extends EventObject,
-  SentEvent extends EventObject = Event,
-> = (
-  sendBack: Sender<Event>,
-  receive: Receiver<SentEvent>,
-) => void | (() => void);
-
-export interface MachineActivityDefinition {
-  type: string;
-}
-
-export type MachineActivity<Scope> = (
-  this: Scope,
-  activity: MachineActivityDefinition,
-) => void | (() => void);
 
 export type MachineActionReference =
   | string
@@ -174,8 +148,6 @@ export type MachineDelayTransition<Event extends EventObject> =
 
 export type MachineEntryExit = MachineActionReference;
 
-export type MachineActivities = string | MachineActivityDefinition | Array<string | MachineActivityDefinition>;
-
 export interface MachineInvokeConfig<Event extends EventObject> {
   id?: string;
   src: string;
@@ -199,7 +171,6 @@ export interface MachineStateNodeConfig<Event extends EventObject> {
   after?: Record<string, MachineDelayTransition<Event>>;
   entry?: MachineEntryExit;
   exit?: MachineEntryExit;
-  activities?: MachineActivities;
   invoke?: MachineInvokeReference<Event> | Array<MachineInvokeReference<Event>>;
   onDone?: MachineDelayTransition<Event>;
 }
@@ -216,7 +187,6 @@ export interface MachineConfig<
     actions?: MachineActionObject;
     guards?: MachineActionObject;
     effects?: Record<string, unknown>;
-    services?: Record<string, unknown>;
   };
   tsTypes?: Typegen;
 }
@@ -291,24 +261,6 @@ type MachineGuardOptions<
     }
   : Record<string, MachineGuard<Scope, Event>>;
 
-type MachineServiceOptions<
-  Scope,
-  Event extends EventObject,
-  Typegen extends TypegenConstraint,
-> = Typegen extends TypegenMeta
-  ? {
-      [Name in keyof Typegen["eventsCausingServices"] & string]?: MachineService<
-        Scope,
-        EventForImplementation<
-          Event,
-          Typegen,
-          Typegen["eventsCausingServices"][Name]
-        >,
-        Event
-      >;
-    }
-  : Record<string, MachineService<Scope, Event, Event>>;
-
 type MachineEffectOptions<
   Scope,
   Event extends EventObject,
@@ -351,11 +303,7 @@ export interface MachineOptions<
   actions?: MachineActionOptions<Scope, Event, Typegen>;
   guards?: MachineGuardOptions<Scope, Event, Typegen>;
   effects?: MachineEffectOptions<Scope, Event, Typegen>;
-  /** @deprecated Use store methods or MachineOptions.effects for new invoke code. */
-  services?: MachineServiceOptions<Scope, Event, Typegen>;
   delays?: MachineDelayOptions<Scope, Event, Typegen>;
-  /** @deprecated Prefer invoke effects with cleanup functions. */
-  activities?: Record<string, MachineActivity<Scope>>;
   types?: Typegen;
 }
 

@@ -1,10 +1,11 @@
-import { action, computed, makeObservable, observable } from "mobx";
-import { match as tsMatch } from "ts-pattern";
+import {action, computed, makeObservable, observable} from "mobx";
+import {match as tsMatch} from "ts-pattern";
 
 import type {
   EventObject,
   Machine,
   MachineOptions,
+  MachineSendEvent,
   MachineStateValue,
   TypegenConstraint,
   TypegenDisabled,
@@ -12,16 +13,32 @@ import type {
 } from "./stateMachine";
 import {
   createMachineActor,
-  MachineActorStatus,
   type MachineActor,
+  MachineActorStatus,
+  MachineCleanupError,
   type MachineSnapshot,
 } from "./runtime";
 
 type MatchesState<Typegen extends TypegenConstraint> =
   Typegen extends TypegenMeta ? Typegen["matchesStates"] : MachineStateValue;
 
+export type MachinePersistenceVersion = string | number;
+
+export type MachinePersistenceTransform = (
+  state: MachineStateValue,
+  fromVersion: MachinePersistenceVersion | undefined,
+) => MachineStateValue | undefined;
+
 export interface MachinePersistenceConfig {
   persistentKey?: string;
+  version?: MachinePersistenceVersion;
+  transformPersistedState?: MachinePersistenceTransform;
+}
+
+interface PersistedMachineStateRecord {
+  readonly type: "mobxstate.persistence.v1";
+  readonly value: MachineStateValue;
+  readonly version?: MachinePersistenceVersion;
 }
 
 export interface MachineStateConfig extends MachinePersistenceConfig {
@@ -41,7 +58,7 @@ export interface IMachineState<
   snapshot: MachineSnapshot<Event> | undefined;
   ready: Promise<MachineActorStatus | undefined>;
 
-  send(event: Event | Event["type"]): void;
+  send(event: MachineSendEvent<Event>): void;
 
   matches(state: MatchesState<Typegen>): boolean;
   matchState: ReturnType<typeof tsMatch<MatchesState<Typegen>>>;
@@ -108,6 +125,40 @@ class MachinesStorageAdapter {
 
 export const MachinesStorage = new MachinesStorageAdapter("MachinesStorage");
 
+const isObjectRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const isPersistenceVersion = (
+  value: unknown,
+): value is MachinePersistenceVersion => {
+  return typeof value === "string" || typeof value === "number";
+};
+
+const isMachineStateValue = (value: unknown): value is MachineStateValue => {
+  if (typeof value === "string") {
+    return true;
+  }
+
+  return isObjectRecord(value) && Object.values(value).every(isMachineStateValue);
+};
+
+const isPersistedMachineStateRecord = (
+  value: unknown,
+): value is PersistedMachineStateRecord => {
+  if (!isObjectRecord(value)) {
+    return false;
+  }
+
+  const version = value.version;
+
+  return (
+    value.type === "mobxstate.persistence.v1" &&
+    isMachineStateValue(value.value) &&
+    (version === undefined || isPersistenceVersion(version))
+  );
+};
+
 const defer = (): Promise<void> => {
   if (typeof globalThis.requestAnimationFrame === "function") {
     return new Promise((resolve) => {
@@ -135,9 +186,7 @@ const isMachineOptions = <
     "actions" in value ||
     "guards" in value ||
     "effects" in value ||
-    "services" in value ||
-    "delays" in value ||
-    "activities" in value
+    "delays" in value
   );
 };
 
@@ -224,12 +273,12 @@ export class MobXStateMachine<
       await defer();
     }
 
-    const initialState = this.getInitialState(state);
+    const initialState = this.getInitialState(actor, state);
     this.isStarted = true;
     return actor.start(initialState);
   };
 
-  public send = (event: Event | Event["type"]): void => {
+  public send = (event: MachineSendEvent<Event>): void => {
     this.actor?.send(event);
   };
 
@@ -245,11 +294,41 @@ export class MobXStateMachine<
 
   public stopMachine = (): void => {
     if (this.actor?.status === MachineActorStatus.Running) {
-      this.actor.stop();
+      const errors: unknown[] = [];
+      let runtimeError: unknown;
+
+      try {
+        this.actor.stop();
+      } catch (error) {
+        if (error instanceof MachineCleanupError) {
+          errors.push(...error.errors);
+        } else {
+          runtimeError = error;
+        }
+      }
+
       this.actor = undefined;
       this.isStarted = false;
-      this.disposes.forEach((cb) => cb());
+
+      this.disposes.forEach((cb) => {
+        try {
+          cb();
+        } catch (error) {
+          errors.push(error);
+        }
+      });
       this.disposes.length = 0;
+
+      if (errors.length > 0) {
+        throw new MachineCleanupError(
+          "MobXStateMachine cleanup failed.",
+          runtimeError === undefined ? errors : [runtimeError, ...errors],
+        );
+      }
+
+      if (runtimeError !== undefined) {
+        throw runtimeError;
+      }
     }
   };
 
@@ -296,25 +375,94 @@ export class MobXStateMachine<
       return;
     }
 
-    MachinesStorage.setItem(this.storageKey, state);
+    MachinesStorage.setItem(this.storageKey, this.createPersistedState(state));
   };
 
   private getInitialState(
+    actor: MachineActor<Scope, Event, Typegen>,
     state?: MachineStateValue,
   ): MachineStateValue | undefined {
+    if (state !== undefined) {
+      return actor.canRestoreStateValue(state) ? state : undefined;
+    }
+
     if (!this.config?.persistentKey) {
+      return undefined;
+    }
+
+    return this.getPersistedState(actor);
+  }
+
+  private getPersistedState(
+    actor: MachineActor<Scope, Event, Typegen>,
+  ): MachineStateValue | undefined {
+    const persistedValue = MachinesStorage.getItem<unknown>(this.storageKey);
+    if (persistedValue === undefined) {
+      return undefined;
+    }
+
+    const record = isPersistedMachineStateRecord(persistedValue)
+      ? persistedValue
+      : undefined;
+    const persistedState = record?.value ?? persistedValue;
+    const fromVersion = record?.version;
+
+    if (!isMachineStateValue(persistedState)) {
+      return undefined;
+    }
+
+    const restoredState = this.transformPersistedState(
+      persistedState,
+      fromVersion,
+    );
+
+    return restoredState !== undefined &&
+      actor.canRestoreStateValue(restoredState)
+      ? restoredState
+      : undefined;
+  }
+
+  private transformPersistedState(
+    state: MachineStateValue,
+    fromVersion: MachinePersistenceVersion | undefined,
+  ): MachineStateValue | undefined {
+    const currentVersion = this.config?.version;
+
+    if (fromVersion !== currentVersion) {
+      if (!this.config?.transformPersistedState) {
+        return currentVersion === undefined ? state : undefined;
+      }
+
+      try {
+        return this.config.transformPersistedState(state, fromVersion);
+      } catch {
+        return undefined;
+      }
+    }
+
+    return state;
+  }
+
+  private createPersistedState(
+    state: MachineStateValue,
+  ): MachineStateValue | PersistedMachineStateRecord {
+    if (
+      this.config?.version === undefined &&
+      !this.config?.transformPersistedState
+    ) {
       return state;
     }
 
-    return (
-      state ??
-      MachinesStorage.getItem<MachineStateValue>(this.storageKey)
-    );
+    return {
+      type: "mobxstate.persistence.v1",
+      value: state,
+      ...(this.config.version === undefined
+        ? {}
+        : { version: this.config.version }),
+    };
   }
 
   private get storageKey(): string {
     return `${this.config?.persistentKey ?? "default"}-${this.machine.id}`;
   }
 }
-
-export { MobXStateMachine as BaseMachineState };

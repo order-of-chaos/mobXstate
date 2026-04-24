@@ -1,2 +1,2 @@
-export * from "./BaseMachineState";
+export * from "./MobXStateMachine";
 

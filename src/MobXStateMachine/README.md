@@ -1,7 +1,7 @@
 # MobXstate
 
-MobXstate добавляет MobX-сторам конечные автоматы с API, близким к XState.
-Конфигурация машины остается XState-shaped, поэтому Stately/XState VSCode
+MobXstate добавляет MobX-сторам конечные автоматы со statechart-shaped API.
+Конфигурация машины остается Stately-friendly, поэтому Stately/XState VSCode
 extension видит `createMachine(...)`, умеет открыть visual editor и генерировать
 typegen. Исполняется это собственным runtime MobXstate, без XState interpreter.
 Runtime не использует отдельный machine context: данные и бизнес-логика живут в
@@ -55,17 +55,25 @@ class CounterStore extends MobXStateMachine<CounterStore, CounterEvent> {
 Машина описывает flow, а поведение живет в MobX-сторе. Имена `actions`,
 `guards`, `delays` и `invoke` сначала ищутся как методы, getters или observable
 properties самого store. `MachineOptions.effects` остается fallback-слоем для
-сложных случаев, а `services` и `activities` сохранены только для миграции.
+сложных случаев.
 
-`BaseMachineState` остается legacy alias для обратной совместимости. Основное
-имя публичного API для нового кода - `MobXStateMachine`.
+## Поддержка возможностей
+
+| Статус | Возможности |
+| --- | --- |
+| Поддерживается | `entry`, `exit`, named actions, named guards, named delays, numeric delays, `after`, `always`, `invoke`, promise effects, cleanup effects, child machines, nested states, parallel states, final states, shallow history, `onDone`, `onError`, typed `send`, persistence validation и persistence versioning. |
+| Удалено | `MachineOptions.services`, `MachineOptions.activities`, state node `activities` и callback invoke services. Для lifecycle-кода используйте методы store или `MachineOptions.effects`. |
+| Явная ошибка | Deep history через `history: "deep"` выбрасывает ошибку при создании runtime config. |
+| Вне scope | Отдельный XState-style machine `context`. В MobXstate контекстом являются поля, getters и методы MobX store. |
 
 ## Использование
 
 - `state` содержит текущее значение состояния и является MobX observable.
 - `snapshot` содержит последний MobXstate snapshot: `value`, `event` и
   `matches(...)`.
-- `send(event)` отправляет событие в машину.
+- `send(event)` отправляет событие в машину. Object events всегда разрешены,
+  string sends типизированы и разрешены только для событий без обязательного
+  payload.
 - `matches(state)` проверяет текущее состояние.
 - `matchState` возвращает `ts-pattern` matcher для декларативного рендера.
 - `actions` выполняются как методы store внутри `runInAction`.
@@ -73,15 +81,24 @@ properties самого store. `MachineOptions.effects` остается fallbac
   `computed`.
 - `delays` читаются как number getters/properties или methods в момент входа в
   состояние.
+- Полный macrostep батчится в одной MobX transaction: observers видят итоговые
+  store mutations и snapshot вместе, без промежуточных состояний между `exit`,
+  transition action и `entry`.
 - `invoke: "methodName"` запускает lifecycle effect из store. Метод может
   вернуть cleanup function, promise или child machine.
+- Синхронные ошибки effects и promise rejections проходят через `onError` как
+  события `error.platform.<invokeId>`.
+- Ошибки actions и guards считаются fatal runtime errors: actor останавливается,
+  активные resources очищаются, исходная ошибка пробрасывается наружу.
+- Ошибки cleanup собираются в `MachineCleanupError`; runtime пытается выполнить
+  все cleanup functions перед тем, как выбросить ошибку.
 - `ready` можно `await`-ить, если старт машины отложен до следующего microtask
   или animation frame.
 - `stopMachine`, `startMachine` и `restart` управляют runtime.
-- `MachineStateConfig` настраивает `persistentKey`, `stopped`, `deferStart` и
-  `strict`. В strict mode отсутствующие named actions, guards, delays и effects
-  выбрасывают понятную ошибку до старта машины. `devTools` принимается для
-  совместимости конфигов.
+- `MachineStateConfig` настраивает `persistentKey`, `version`,
+  `transformPersistedState`, `stopped`, `deferStart` и `strict`. В strict mode
+  отсутствующие named actions, guards, delays и effects выбрасывают понятную
+  ошибку до старта машины. `devTools` принимается для совместимости конфигов.
 - `MachineOptions<Store, Event, Typegen>` поддерживает typegen-aware callbacks:
   action получает только те события, которые реально могут ее вызвать.
 
@@ -89,6 +106,12 @@ properties самого store. `MachineOptions.effects` остается fallbac
 
 Если передать `persistentKey`, MobXstate сохранит текущее state value в
 `localStorage` под namespace `MachinesStorage`.
+Перед восстановлением значение валидируется against текущей machine config.
+Некорректные, переименованные или неполные state values игнорируются, после чего
+машина стартует из initial state и перезаписывает storage актуальным значением.
+Если задан `version`, MobXstate сохраняет versioned record.
+`transformPersistedState(state, fromVersion)` может нормализовать сохраненное
+значение до validation. Без `version` сохраняется raw state-value формат.
 
 ```ts
 class CounterStore extends MobXStateMachine<CounterStore, CounterEvent> {
@@ -107,7 +130,11 @@ class CounterStore extends MobXStateMachine<CounterStore, CounterEvent> {
 
 `createMachine` специально сохраняет форму XState config. Реализации лучше
 размещать прямо в MobX store. `MachineOptions.effects` нужен в основном как
-override или migration layer.
+override layer.
+
+Lifecycle-код описывайте через `invoke` и метод store, который возвращает cleanup
+function, promise, child machine или `void`. Если effect должен отправить событие
+назад в машину, вызывайте `this.send(...)` внутри метода store.
 
 ```ts
 const machine = createMachine({
@@ -130,31 +157,3 @@ class GameStore extends MobXStateMachine<GameStore, GameEvent> {
   }
 }
 ```
-
-## Миграция callbacks
-
-Было:
-
-```ts
-actions: {
-  selectTable(context, event) {
-    context.store.selectTable(event.payload.id);
-  },
-}
-```
-
-Стало:
-
-```ts
-class GameStore extends MobXStateMachine<GameStore, GameEvent> {
-  selectTable(event: GameEvent) {
-    if (event.type === "SELECT_TABLE") {
-      this.selectTableById(event.payload.id);
-    }
-  }
-}
-```
-
-Если callback использует `this`, он должен быть обычной function shorthand или
-`function (...) {}`. Arrow functions сохраняют внешний `this` и не получат
-экземпляр MobX-стора.

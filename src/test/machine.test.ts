@@ -4,9 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createMachine,
   MobXStateMachine,
+  MachinesStorage,
   type DoneInvokeEvent,
   type MachineOptions,
-} from "../BaseMachineState";
+  type MachinePersistenceTransform,
+  type MachinePersistenceVersion,
+  type MachineStateValue,
+} from "../MobXStateMachine";
 
 type CounterEvent =
   | { type: "INC"; by: number }
@@ -65,11 +69,9 @@ const counterOptions: MachineOptions<CounterState, CounterEvent> = {
       }
     },
   },
-  services: {
+  effects: {
     loadValue() {
-      return (send: (event: CounterEvent) => void) => {
-        send({ type: "LOADED", value: this.loadedValue });
-      };
+      this.send({ type: "LOADED", value: this.loadedValue });
     },
   },
 };
@@ -227,7 +229,7 @@ const promiseOptions: MachineOptions<PromiseState, PromiseEvent> = {
       }
     },
   },
-  services: {
+  effects: {
     loadNumber() {
       return Promise.resolve(this.value);
     },
@@ -305,18 +307,18 @@ class EffectState extends MobXStateMachine<EffectState, EffectEvent> {
   }
 }
 
-type ActivityEvent = { type: "STOP" };
+type LifecycleEvent = { type: "STOP" };
 
-const activityMachine = createMachine<ActivityEvent>({
-  id: "activity",
+const lifecycleMachine = createMachine<LifecycleEvent>({
+  id: "lifecycle",
   predictableActionArguments: true,
   schema: {
-    events: {} as ActivityEvent,
+    events: {} as LifecycleEvent,
   },
   initial: "running",
   states: {
     running: {
-      activities: ["polling"],
+      invoke: "polling",
       on: {
         STOP: "stopped",
       },
@@ -325,25 +327,25 @@ const activityMachine = createMachine<ActivityEvent>({
   },
 });
 
-const activityOptions: MachineOptions<ActivityState, ActivityEvent> = {
-  activities: {
+const lifecycleOptions: MachineOptions<LifecycleState, LifecycleEvent> = {
+  effects: {
     polling(activity) {
-      this.activityTypes.push(activity.type);
+      this.effectEvents.push(activity.type);
 
       return () => {
-        this.activityDisposals += 1;
+        this.effectDisposals += 1;
       };
     },
   },
 };
 
-class ActivityState extends MobXStateMachine<ActivityState, ActivityEvent> {
-  public activityTypes: string[] = [];
+class LifecycleState extends MobXStateMachine<LifecycleState, LifecycleEvent> {
+  public effectEvents: string[] = [];
 
-  public activityDisposals = 0;
+  public effectDisposals = 0;
 
   constructor() {
-    super(activityMachine, activityOptions);
+    super(lifecycleMachine, lifecycleOptions);
   }
 }
 
@@ -557,6 +559,15 @@ class ParallelState extends MobXStateMachine<ParallelState, ParallelEvent> {
   }
 }
 
+class ParallelPersistState extends MobXStateMachine<
+  ParallelPersistState,
+  ParallelEvent
+> {
+  constructor(persistentKey: string) {
+    super(parallelMachine, { persistentKey, deferStart: false });
+  }
+}
+
 type PersistEvent = { type: "GO" };
 
 const persistMachine = createMachine<PersistEvent>({
@@ -582,6 +593,63 @@ class PersistState extends MobXStateMachine<PersistState, PersistEvent> {
   }
 }
 
+interface PersistedMachineStateRecord {
+  readonly type: "mobxstate.persistence.v1";
+  readonly value: MachineStateValue;
+  readonly version?: MachinePersistenceVersion;
+}
+
+class VersionedPersistState extends MobXStateMachine<
+  VersionedPersistState,
+  PersistEvent
+> {
+  constructor(
+    persistentKey: string,
+    version: MachinePersistenceVersion,
+    transformPersistedState?: MachinePersistenceTransform,
+  ) {
+    super(persistMachine, {
+      persistentKey,
+      version,
+      transformPersistedState,
+      deferStart: false,
+    });
+  }
+}
+
+type NestedPersistEvent = { type: "DIRTY" };
+
+const nestedPersistMachine = createMachine<NestedPersistEvent>({
+  id: "nestedPersist",
+  predictableActionArguments: true,
+  schema: {
+    events: {} as NestedPersistEvent,
+  },
+  initial: "editing",
+  states: {
+    editing: {
+      initial: "clean",
+      states: {
+        clean: {
+          on: {
+            DIRTY: "dirty",
+          },
+        },
+        dirty: {},
+      },
+    },
+  },
+});
+
+class NestedPersistState extends MobXStateMachine<
+  NestedPersistState,
+  NestedPersistEvent
+> {
+  constructor(persistentKey: string) {
+    super(nestedPersistMachine, { persistentKey, deferStart: false });
+  }
+}
+
 describe("MobXStateMachine", () => {
   afterEach(() => {
     configure({ enforceActions: "never" });
@@ -602,7 +670,7 @@ describe("MobXStateMachine", () => {
     dispose();
   });
 
-  it("runs actions and services without passing a machine context", async () => {
+  it("runs actions and effects without passing a machine context", async () => {
     const counter = new CounterState();
 
     await counter.ready;
@@ -671,6 +739,100 @@ describe("MobXStateMachine", () => {
 
     expect(strict.matches("done")).toBe(true);
     expect(strict.starts).toBe(1);
+  });
+
+  it("batches exit actions, transition actions, entry actions and snapshot publish", async () => {
+    type BatchEvent = { type: "GO" };
+
+    const batchMachine = createMachine<BatchEvent>({
+      id: "batch",
+      predictableActionArguments: true,
+      schema: {
+        events: {} as BatchEvent,
+      },
+      initial: "idle",
+      states: {
+        idle: {
+          exit: "recordExit",
+          on: {
+            GO: {
+              target: "done",
+              actions: "recordTransition",
+            },
+          },
+        },
+        done: {
+          entry: "recordEntry",
+        },
+      },
+    });
+
+    class BatchState extends MobXStateMachine<BatchState, BatchEvent> {
+      public exitCount = 0;
+
+      public transitionCount = 0;
+
+      public entryCount = 0;
+
+      constructor() {
+        super(batchMachine, { deferStart: false });
+
+        makeObservable(this, {
+          entryCount: observable,
+          exitCount: observable,
+          transitionCount: observable,
+        });
+      }
+
+      public recordExit(): void {
+        this.exitCount += 1;
+      }
+
+      public recordTransition(): void {
+        this.transitionCount += 1;
+      }
+
+      public recordEntry(): void {
+        this.entryCount += 1;
+      }
+    }
+
+    const store = new BatchState();
+    await store.ready;
+
+    const observations: Array<{
+      entryCount: number;
+      exitCount: number;
+      state: MachineStateValue | undefined;
+      transitionCount: number;
+    }> = [];
+    const dispose = autorun(() => {
+      observations.push({
+        entryCount: store.entryCount,
+        exitCount: store.exitCount,
+        state: store.state,
+        transitionCount: store.transitionCount,
+      });
+    });
+
+    store.send("GO");
+
+    expect(observations).toEqual([
+      {
+        entryCount: 0,
+        exitCount: 0,
+        state: "idle",
+        transitionCount: 0,
+      },
+      {
+        entryCount: 1,
+        exitCount: 1,
+        state: "done",
+        transitionCount: 1,
+      },
+    ]);
+
+    dispose();
   });
 
   it("resolves actions, guards, delays and effects from store members", async () => {
@@ -849,16 +1011,16 @@ describe("MobXStateMachine", () => {
     expect(effect.pet).toBe("cat");
   });
 
-  it("starts and cleans up activities against the MobX store instance", async () => {
-    const activity = new ActivityState();
+  it("starts and cleans up invoke effects against the MobX store instance", async () => {
+    const activity = new LifecycleState();
 
     await activity.ready;
-    expect(activity.activityTypes).toEqual(["polling"]);
+    expect(activity.effectEvents).toEqual(["xstate.init"]);
 
     activity.send({ type: "STOP" });
 
     expect(activity.matches("stopped")).toBe(true);
-    expect(activity.activityDisposals).toBe(1);
+    expect(activity.effectDisposals).toBe(1);
   });
 
   it("supports named dynamic delays from the MobX store instance", async () => {
@@ -884,6 +1046,15 @@ describe("MobXStateMachine", () => {
     await manual.startMachine();
 
     expect(manual.matches("idle")).toBe(true);
+  });
+
+  it("accepts string sends for payloadless events", async () => {
+    const counter = new CounterState();
+
+    await counter.ready;
+    counter.send("START");
+
+    expect(counter.matches("ready")).toBe(true);
   });
 
   it("supports final states", async () => {
@@ -945,6 +1116,190 @@ describe("MobXStateMachine", () => {
     await second.ready;
 
     expect(second.matches("active")).toBe(true);
+  });
+
+  it("stores versioned persisted state records when version is configured", async () => {
+    const persistentKey = `versioned-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-persist`;
+    const machine = new VersionedPersistState(persistentKey, 2);
+
+    await machine.ready;
+    machine.send("GO");
+
+    expect(MachinesStorage.getItem<PersistedMachineStateRecord>(storageKey)).toEqual({
+      type: "mobxstate.persistence.v1",
+      value: "active",
+      version: 2,
+    });
+  });
+
+  it("transforms versioned persisted state before restore", async () => {
+    const persistentKey = `transform-versioned-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-persist`;
+    MachinesStorage.setItem<PersistedMachineStateRecord>(storageKey, {
+      type: "mobxstate.persistence.v1",
+      value: "savedActive",
+      version: 1,
+    });
+
+    const transformPersistedState: MachinePersistenceTransform = (
+      state,
+      fromVersion,
+    ) => {
+      return fromVersion === 1 && state === "savedActive" ? "active" : state;
+    };
+    const machine = new VersionedPersistState(
+      persistentKey,
+      2,
+      transformPersistedState,
+    );
+    await machine.ready;
+
+    expect(machine.matches("active")).toBe(true);
+    expect(MachinesStorage.getItem<PersistedMachineStateRecord>(storageKey)).toEqual({
+      type: "mobxstate.persistence.v1",
+      value: "active",
+      version: 2,
+    });
+  });
+
+  it("transforms unversioned raw persisted state when version is introduced", async () => {
+    const persistentKey = `transform-raw-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-persist`;
+    MachinesStorage.setItem<MachineStateValue>(storageKey, "active");
+
+    const transformPersistedState: MachinePersistenceTransform = (
+      state,
+      fromVersion,
+    ) => {
+      return fromVersion === undefined ? state : undefined;
+    };
+    const machine = new VersionedPersistState(
+      persistentKey,
+      2,
+      transformPersistedState,
+    );
+    await machine.ready;
+
+    expect(machine.matches("active")).toBe(true);
+    expect(MachinesStorage.getItem<PersistedMachineStateRecord>(storageKey)).toEqual({
+      type: "mobxstate.persistence.v1",
+      value: "active",
+      version: 2,
+    });
+  });
+
+  it("ignores mismatched persisted versions without transform", async () => {
+    const persistentKey = `version-mismatch-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-persist`;
+    MachinesStorage.setItem<PersistedMachineStateRecord>(storageKey, {
+      type: "mobxstate.persistence.v1",
+      value: "active",
+      version: 1,
+    });
+
+    const machine = new VersionedPersistState(persistentKey, 2);
+    await machine.ready;
+
+    expect(machine.matches("idle")).toBe(true);
+    expect(MachinesStorage.getItem<PersistedMachineStateRecord>(storageKey)).toEqual({
+      type: "mobxstate.persistence.v1",
+      value: "idle",
+      version: 2,
+    });
+  });
+
+  it("ignores invalid transform results before restore", async () => {
+    const persistentKey = `invalid-transform-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-persist`;
+    MachinesStorage.setItem<PersistedMachineStateRecord>(storageKey, {
+      type: "mobxstate.persistence.v1",
+      value: "savedActive",
+      version: 1,
+    });
+
+    const transformPersistedState: MachinePersistenceTransform = () =>
+      "missing";
+    const machine = new VersionedPersistState(
+      persistentKey,
+      2,
+      transformPersistedState,
+    );
+    await machine.ready;
+
+    expect(machine.matches("idle")).toBe(true);
+    expect(MachinesStorage.getItem<PersistedMachineStateRecord>(storageKey)).toEqual({
+      type: "mobxstate.persistence.v1",
+      value: "idle",
+      version: 2,
+    });
+  });
+
+  it("ignores invalid persisted string states before restore", async () => {
+    const persistentKey = `invalid-string-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-persist`;
+    MachinesStorage.setItem<MachineStateValue>(storageKey, "missing");
+
+    const machine = new PersistState(persistentKey);
+    await machine.ready;
+
+    expect(machine.matches("idle")).toBe(true);
+    expect(MachinesStorage.getItem<MachineStateValue>(storageKey)).toBe("idle");
+  });
+
+  it("ignores invalid persisted nested state values before restore", async () => {
+    const persistentKey = `invalid-nested-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-nestedPersist`;
+    MachinesStorage.setItem<MachineStateValue>(storageKey, {
+      editing: "missing",
+    });
+
+    const machine = new NestedPersistState(persistentKey);
+    await machine.ready;
+
+    expect(machine.state).toEqual({
+      editing: "clean",
+    });
+    expect(MachinesStorage.getItem<MachineStateValue>(storageKey)).toEqual({
+      editing: "clean",
+    });
+  });
+
+  it("ignores incomplete persisted parallel state values before restore", async () => {
+    const persistentKey = `invalid-parallel-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-parallel`;
+    MachinesStorage.setItem<MachineStateValue>(storageKey, {
+      left: "done",
+    });
+
+    const machine = new ParallelPersistState(persistentKey);
+    await machine.ready;
+
+    expect(machine.state).toEqual({
+      left: "idle",
+      right: "idle",
+    });
+    expect(MachinesStorage.getItem<MachineStateValue>(storageKey)).toEqual({
+      left: "idle",
+      right: "idle",
+    });
+  });
+
+  it("restores complete persisted parallel state values", async () => {
+    const persistentKey = `valid-parallel-${Date.now()}-${Math.random()}`;
+    const storageKey = `${persistentKey}-parallel`;
+    MachinesStorage.setItem<MachineStateValue>(storageKey, {
+      left: "done",
+      right: "idle",
+    });
+
+    const machine = new ParallelPersistState(persistentKey);
+    await machine.ready;
+
+    expect(machine.state).toEqual({
+      left: "done",
+      right: "idle",
+    });
   });
 
   it("throws clear errors for unknown initial states", async () => {

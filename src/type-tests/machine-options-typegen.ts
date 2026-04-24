@@ -1,4 +1,4 @@
-import type { MachineOptions } from "../BaseMachineState";
+import type { MachineOptions } from "../MobXStateMachine";
 
 type TableEvent =
   | { type: "SELECT_TABLE"; payload: { bet: number } }
@@ -13,7 +13,6 @@ interface Typegen0 {
     actions: "sitAtMoneyTable" | "turnWithCard";
     delays: never;
     guards: never;
-    services: "loadUser";
   };
   eventsCausingActions: {
     sitAtMoneyTable: "SELECT_TABLE";

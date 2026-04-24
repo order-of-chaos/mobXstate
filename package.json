@@ -12,10 +12,12 @@
   "bugs": {
     "url": "https://github.com/order-of-chaos/mobXstate/issues"
   },
-  "homepage": "https://github.com/order-of-chaos/mobXstate#readme",
+  "homepage": "https://order-of-chaos.github.io/mobXstate/docs/",
   "keywords": [
     "mobx",
+    "typescript",
     "xstate",
+    "statechart",
     "statecharts",
     "state-machine",
     "finite-state-machine",
@@ -36,6 +38,7 @@
     "dist/index.*",
     "dist/MobXStateMachine",
     "docs",
+    "examples/README.md",
     "examples/live",
     "examples/standalone"
   ],
@@ -51,10 +54,21 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false && tsc -p tsconfig.test.json && tsc -p tsconfig.type-tests.json && tsc -p tsconfig.examples.json",
     "build": "npm run clean && tsc && vite build",
+    "pages:build": "node ./scripts/build-pages.mjs",
     "lint": "eslint src examples --report-unused-disable-directives --max-warnings 0",
     "pack:dry-run": "npm pack --dry-run",
+    "pack:package": "node ./scripts/pack-package.mjs",
+    "changeset": "changeset",
+    "release:login": "node ./scripts/release.mjs login",
+    "release:whoami": "node ./scripts/release.mjs whoami",
+    "release:status": "node ./scripts/release.mjs status",
+    "release:version": "node ./scripts/release.mjs version",
+    "release:check": "node ./scripts/release.mjs check",
+    "release:publish": "node ./scripts/release.mjs publish",
+    "release:ship": "node ./scripts/release.mjs ship",
     "smoke:package": "node scripts/package-smoke.mjs",
-    "test": "vitest"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "ts-pattern": "^5.0.1"
@@ -63,6 +77,7 @@
     "mobx": "^6.9.0"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",
     "@orderofchaos/ling": "^0.2.0",
     "eslint": "^10.2.1",

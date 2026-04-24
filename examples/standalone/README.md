@@ -3,6 +3,8 @@
 These examples compile in this repository and are included in `npm run
 typecheck`.
 
+Public docs entrypoint: `https://order-of-chaos.github.io/mobXstate/docs/examples/`.
+
 - `counter.ts` shows regular actions bound to a MobX store.
 - `async-loader.ts` shows a promise invoke and an `onDone` action.
 - `live-stream.ts` shows `invoke: "stream"` resolving to a store lifecycle

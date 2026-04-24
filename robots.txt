@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://order-of-chaos.github.io/mobXstate/sitemap.xml

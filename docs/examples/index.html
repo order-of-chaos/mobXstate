@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Examples | MobXstate Docs</title>
+    <meta name="description" content="Live demo and standalone MobXstate examples." />
+    <meta property="og:title" content="Examples | MobXstate Docs" />
+    <meta property="og:description" content="Live demo and standalone MobXstate examples." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://order-of-chaos.github.io/mobXstate/docs/examples/" />
+    <link rel="canonical" href="https://order-of-chaos.github.io/mobXstate/docs/examples/" />
+    <style>:root {
+  color-scheme: light;
+  --bg: #f5efe3;
+  --panel: #fffaf2;
+  --ink: #1d160f;
+  --muted: #6f6254;
+  --line: #d7c7b3;
+  --accent: #9b4d1f;
+  --shadow: 0 18px 40px rgba(67, 39, 18, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: "Georgia", "Iowan Old Style", "Times New Roman", serif;
+  background: radial-gradient(circle at top, #fff8ef, var(--bg) 60%);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+.shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 20px 72px;
+}
+
+.hero {
+  background: linear-gradient(145deg, rgba(255, 250, 242, 0.96), rgba(243, 223, 198, 0.92));
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 32px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  margin: 12px 0 10px;
+}
+
+.hero p {
+  max-width: 60ch;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.nav a {
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.content {
+  margin-top: 28px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.card h2,
+.card h3 {
+  margin-top: 1.4em;
+}
+
+.card h1:first-child,
+.card h2:first-child,
+.card h3:first-child {
+  margin-top: 0;
+}
+
+.card p,
+.card li {
+  line-height: 1.7;
+}
+
+.card ul,
+.card ol {
+  padding-left: 1.4rem;
+}
+
+pre {
+  overflow-x: auto;
+  background: #1f1913;
+  color: #f7f0e6;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+code {
+  font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+}
+
+.footer {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}</style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div class="eyebrow">MobXstate</div>
+        <h1>Examples</h1>
+        <p>Live demo and standalone MobXstate examples.</p>
+        <nav class="nav" aria-label="Docs navigation"><a href="https://order-of-chaos.github.io/mobXstate/docs/">Docs</a><a href="https://order-of-chaos.github.io/mobXstate/docs/getting-started/">Getting Started</a><a href="https://order-of-chaos.github.io/mobXstate/docs/api-reference/">API Reference</a><a href="https://order-of-chaos.github.io/mobXstate/docs/examples/">Examples</a><a href="https://order-of-chaos.github.io/mobXstate/">Live Demo</a></nav>
+      </header>
+      <main class="content">
+        <article class="card">
+          <h1>Examples</h1>
+          <h2>Live Page</h2>
+          <ul><li>Public demo: <a href="https://order-of-chaos.github.io/mobXstate/">MobXstate live page</a></li><li>Local dev: run <code>npm run dev</code> and open <code>/examples/live/</code> in the Vite server.</li></ul>
+          <p>The live page shows:</p>
+          <ul><li>cat routine with actions, guards, and delays</li><li>dog walk with invoke and delayed transitions</li><li>checkout flow with explicit process states</li><li>shelter checklist with parallel regions</li></ul>
+          <h2>Standalone Example Files</h2>
+          <p>These example files are included in repository typechecking.</p>
+          <ul><li><code>examples/standalone/counter.ts</code> shows regular actions on a MobX store.</li><li><code>examples/standalone/async-loader.ts</code> shows promise invoke and <code>onDone</code>.</li><li><code>examples/standalone/live-stream.ts</code> shows lifecycle effects and cleanup.</li><li><code>examples/standalone/parallel-checkout.ts</code> shows parallel regions and parent <code>onDone</code>.</li><li><code>examples/standalone/traffic-light.ts</code> shows entry actions and named delays.</li><li><code>examples/standalone/typegen-narrowing.ts</code> shows typegen-aware callback narrowing.</li><li><code>examples/standalone/wizard-flow.ts</code> shows nested states, shallow history, guards, and invoke error handling.</li></ul>
+          <h2>Repository Navigation</h2>
+          <ul><li>Repo-level examples guide lives in <a href="https://github.com/order-of-chaos/mobXstate/blob/master/examples/README.md">examples/README.md</a>.</li><li>Release and packaging docs live in <a href="https://github.com/order-of-chaos/mobXstate/blob/master/RELEASING.md">RELEASING.md</a>.</li></ul>
+        </article>
+      </main>
+      <footer class="footer">
+        Canonical docs source lives in <code>docs/</code>. Public demo:
+        <a href="https://order-of-chaos.github.io/mobXstate/">home page</a>.
+      </footer>
+    </div>
+  </body>
+</html>

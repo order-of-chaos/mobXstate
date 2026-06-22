@@ -1,6 +1,6 @@
 {
   "name": "@orderofchaos/mobxstate",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Statechart-shaped finite state machines for MobX stores with Stately-friendly configs and no separate machine context.",
   "type": "module",
   "license": "MIT",

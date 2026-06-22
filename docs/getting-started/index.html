@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Getting Started | MobXstate Docs</title>
+    <meta name="description" content="Install MobXstate and start with the smallest working setup." />
+    <meta property="og:title" content="Getting Started | MobXstate Docs" />
+    <meta property="og:description" content="Install MobXstate and start with the smallest working setup." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://order-of-chaos.github.io/mobXstate/docs/getting-started/" />
+    <link rel="canonical" href="https://order-of-chaos.github.io/mobXstate/docs/getting-started/" />
+    <style>:root {
+  color-scheme: light;
+  --bg: #f5efe3;
+  --panel: #fffaf2;
+  --ink: #1d160f;
+  --muted: #6f6254;
+  --line: #d7c7b3;
+  --accent: #9b4d1f;
+  --shadow: 0 18px 40px rgba(67, 39, 18, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: "Georgia", "Iowan Old Style", "Times New Roman", serif;
+  background: radial-gradient(circle at top, #fff8ef, var(--bg) 60%);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+.shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 20px 72px;
+}
+
+.hero {
+  background: linear-gradient(145deg, rgba(255, 250, 242, 0.96), rgba(243, 223, 198, 0.92));
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 32px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  margin: 12px 0 10px;
+}
+
+.hero p {
+  max-width: 60ch;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.nav a {
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.content {
+  margin-top: 28px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.card h2,
+.card h3 {
+  margin-top: 1.4em;
+}
+
+.card h1:first-child,
+.card h2:first-child,
+.card h3:first-child {
+  margin-top: 0;
+}
+
+.card p,
+.card li {
+  line-height: 1.7;
+}
+
+.card ul,
+.card ol {
+  padding-left: 1.4rem;
+}
+
+pre {
+  overflow-x: auto;
+  background: #1f1913;
+  color: #f7f0e6;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+code {
+  font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+}
+
+.footer {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}</style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div class="eyebrow">MobXstate</div>
+        <h1>Getting Started</h1>
+        <p>Install MobXstate and start with the smallest working setup.</p>
+        <nav class="nav" aria-label="Docs navigation"><a href="https://order-of-chaos.github.io/mobXstate/docs/">Docs</a><a href="https://order-of-chaos.github.io/mobXstate/docs/getting-started/">Getting Started</a><a href="https://order-of-chaos.github.io/mobXstate/docs/api-reference/">API Reference</a><a href="https://order-of-chaos.github.io/mobXstate/docs/examples/">Examples</a><a href="https://order-of-chaos.github.io/mobXstate/">Live Demo</a></nav>
+      </header>
+      <main class="content">
+        <article class="card">
+          <h1>Getting Started</h1>
+          <h2>Install</h2>
+          <pre><code class="language-sh">npm install @orderofchaos/mobxstate mobx</code></pre>
+          <h2>Smallest Working Example</h2>
+          <pre><code class="language-ts">import {
+            MobXStateMachine,
+            createMachine,
+          } from &quot;@orderofchaos/mobxstate&quot;;
+          
+          type CounterEvent =
+            | { type: &quot;RESET&quot; }
+            | { type: &quot;INC&quot;; by: number };
+          
+          const counterMachine = createMachine&lt;CounterEvent&gt;({
+            id: &quot;counter&quot;,
+            predictableActionArguments: true,
+            schema: {
+              events: {} as CounterEvent,
+            },
+            initial: &quot;idle&quot;,
+            states: {
+              idle: {
+                on: {
+                  INC: {
+                    actions: &quot;increment&quot;,
+                  },
+                  RESET: {
+                    actions: &quot;reset&quot;,
+                  },
+                },
+              },
+            },
+          });
+          
+          class CounterStore extends MobXStateMachine&lt;CounterStore, CounterEvent&gt; {
+            public count = 0;
+          
+            constructor() {
+              super(counterMachine);
+            }
+          
+            public increment(event: CounterEvent): void {
+              if (event.type === &quot;INC&quot;) {
+                this.count += event.by;
+              }
+            }
+          
+            public reset(): void {
+              this.count = 0;
+            }
+          }</code></pre>
+          <h2>Mental Model</h2>
+          <ul><li>The machine config describes allowed state flow.</li><li>MobX store methods implement actions and lifecycle effects.</li><li>MobX getters, boolean properties, and pure methods implement guards.</li><li>Number getters, properties, and methods can back named delays.</li></ul>
+          <h2>Requirements</h2>
+          <ul><li>Node.js 18 or newer.</li><li>TypeScript 5 or newer for the shipped declarations.</li><li>MobX 6 installed by the consuming application.</li></ul>
+          <h2>Next Steps</h2>
+          <ul><li>Continue with the <a href="https://order-of-chaos.github.io/mobXstate/docs/api-reference/">API reference</a> for runtime behavior and feature support.</li><li>Open the <a href="https://order-of-chaos.github.io/mobXstate/docs/examples/">examples guide</a> for the live demo and standalone samples.</li></ul>
+        </article>
+      </main>
+      <footer class="footer">
+        Canonical docs source lives in <code>docs/</code>. Public demo:
+        <a href="https://order-of-chaos.github.io/mobXstate/">home page</a>.
+      </footer>
+    </div>
+  </body>
+</html>

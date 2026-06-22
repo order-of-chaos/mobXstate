@@ -149,7 +149,24 @@ code {
         <article class="card">
           <h1>API Reference</h1>
           <h2>Primary Exports</h2>
-          <ul><li><code>createMachine(config)</code> creates a machine descriptor with a statechart-shaped config.</li><li><code>MobXStateMachine</code> starts and observes the machine through MobXstate's runtime.</li><li><code>MachineOptions&amp;lt;Store, Event, Typegen&amp;gt;</code> provides fallback and override <code>actions</code>, <code>guards</code>, <code>effects</code>, and <code>delays</code>.</li><li><code>MachineAction</code>, <code>MachineGuard</code>, and <code>MachineEffect</code> describe callback contracts where <code>this</code> is the MobX store and the first argument is the event.</li></ul>
+          <ul><li><code>createMachine(config)</code> creates a machine descriptor with a statechart-shaped config.</li><li><code>MobXStateMachine</code> starts and observes the machine through MobXstate's runtime.</li><li><code>@orderofchaos/mobxstate/decorators</code> exports a decorator-compatible <code>MobXStateMachine</code> with the same inheritance API for stores that use MobX property decorators.</li><li><code>MachineOptions&amp;lt;Store, Event, Typegen&amp;gt;</code> provides fallback and override <code>actions</code>, <code>guards</code>, <code>effects</code>, and <code>delays</code>.</li><li><code>MachineAction</code>, <code>MachineGuard</code>, and <code>MachineEffect</code> describe callback contracts where <code>this</code> is the MobX store and the first argument is the event.</li></ul>
+          <h2>MobX Decorator Stores</h2>
+          <p>Use the default package entrypoint when subclasses call <code>makeObservable</code> with an annotation map:</p>
+          <pre><code class="language-ts">import { MobXStateMachine } from &quot;@orderofchaos/mobxstate&quot;;</code></pre>
+          <p>Use the decorators entrypoint when subclasses use MobX property decorators:</p>
+          <pre><code class="language-ts">import { MobXStateMachine } from &quot;@orderofchaos/mobxstate/decorators&quot;;
+          import { makeObservable, observable } from &quot;mobx&quot;;
+          
+          class CounterStore extends MobXStateMachine&lt;CounterStore, CounterEvent&gt; {
+            @observable
+            public count = 0;
+          
+            constructor() {
+              super(counterMachine);
+              makeObservable(this);
+            }
+          }</code></pre>
+          <p>Both entrypoints keep the same <code>extends MobXStateMachine&amp;lt;Store, Event&amp;gt;</code> store shape and share the same state machine runtime.</p>
           <h2>Runtime Behavior</h2>
           <ul><li>Named actions resolve to store methods first and run inside <code>runInAction</code>.</li><li>Named guards resolve to store getters, boolean properties, or pure methods.</li><li>Named delays resolve to store number getters, properties, or methods.</li><li>Full macrosteps are batched in one MobX transaction.</li><li><code>invoke: &amp;quot;methodName&amp;quot;</code> starts a store lifecycle effect that may return a promise, cleanup function, child machine, or <code>void</code>.</li><li>Promise rejections and synchronous invoke failures route through <code>onError</code> when possible.</li><li>Action and guard failures are fatal runtime errors and clean up active resources before rethrowing.</li><li>Cleanup failures are reported as <code>MachineCleanupError</code> after all cleanup functions have been attempted.</li></ul>
           <h2>Observable State</h2>

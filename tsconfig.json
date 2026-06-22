@@ -27,7 +27,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/index.ts", "src/MobXStateMachine/**/*.ts"],
+  "include": ["src/index.ts", "src/decorators.ts", "src/MobXStateMachine/**/*.ts"],
   "exclude": ["node_modules", "dist", "examples", "**/*.test.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

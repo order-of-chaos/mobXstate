@@ -32,11 +32,15 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./decorators": {
+      "types": "./dist/decorators.d.ts",
+      "import": "./dist/decorators.mjs",
+      "require": "./dist/decorators.cjs"
     }
   },
   "files": [
-    "dist/index.*",
-    "dist/MobXStateMachine",
+    "dist",
     "docs",
     "examples/README.md",
     "examples/live",

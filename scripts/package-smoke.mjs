@@ -54,6 +54,10 @@ const assertPackedFiles = (packInfo) => {
     "dist/index.cjs",
     "dist/index.d.ts",
     "dist/index.mjs",
+    "dist/decorators.cjs",
+    "dist/decorators.d.ts",
+    "dist/decorators.mjs",
+    "dist/MobXStateMachine/MobXStateMachine.decorators.d.ts",
     "dist/MobXStateMachine/MobXStateMachine.d.ts",
     "dist/MobXStateMachine/index.d.ts",
     "dist/MobXStateMachine/runtime.d.ts",
@@ -209,6 +213,97 @@ class Store extends MobXStateMachine {
   );
 
   await fs.writeFile(
+    path.join(consumerRoot, "decorators-esm.mjs"),
+    `import {
+  MobXStateMachine,
+  createMachine,
+} from "${packageName}/decorators";
+
+const machine = createMachine({
+  id: "decoratorsEsmSmoke",
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        INC: {
+          actions: "increment",
+        },
+      },
+    },
+  },
+});
+
+class Store extends MobXStateMachine {
+  count = 0;
+
+  constructor() {
+    super(machine, { deferStart: false });
+  }
+
+  increment(event) {
+    this.count += event.by;
+  }
+}
+
+const store = new Store();
+await store.ready;
+store.send({ type: "INC", by: 4 });
+
+if (!store.matches("idle") || store.count !== 4) {
+  throw new Error("Decorators ESM import smoke failed.");
+}
+`,
+  );
+
+  await fs.writeFile(
+    path.join(consumerRoot, "decorators-cjs.cjs"),
+    `const {
+  MobXStateMachine,
+  createMachine,
+} = require("${packageName}/decorators");
+
+const machine = createMachine({
+  id: "decoratorsCjsSmoke",
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        INC: {
+          actions: "increment",
+        },
+      },
+    },
+  },
+});
+
+class Store extends MobXStateMachine {
+  count = 0;
+
+  constructor() {
+    super(machine, { deferStart: false });
+  }
+
+  increment(event) {
+    this.count += event.by;
+  }
+}
+
+(async () => {
+  const store = new Store();
+  await store.ready;
+  store.send({ type: "INC", by: 5 });
+
+  if (!store.matches("idle") || store.count !== 5) {
+    throw new Error("Decorators CJS require smoke failed.");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+`,
+  );
+
+  await fs.writeFile(
     path.join(consumerRoot, "types.ts"),
     `import {
   MobXStateMachine,
@@ -216,6 +311,12 @@ class Store extends MobXStateMachine {
   type MachineOptions,
   type MachineSendEvent,
 } from "${packageName}";
+import {
+  MobXStateMachine as DecoratorMobXStateMachine,
+  createMachine as createDecoratorMachine,
+  type IMachineState as DecoratorMachineState,
+} from "${packageName}/decorators";
+import { makeObservable, observable } from "mobx";
 
 type SmokeEvent =
   | { type: "RESET" }
@@ -244,6 +345,42 @@ class Store extends MobXStateMachine<Store, SmokeEvent> {
     }
   }
 }
+
+const decoratorMachine = createDecoratorMachine<SmokeEvent>({
+  id: "decoratorTypeSmoke",
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        INC: {
+          actions: "increment",
+        },
+      },
+    },
+  },
+});
+
+class DecoratorStore extends DecoratorMobXStateMachine<
+  DecoratorStore,
+  SmokeEvent
+> {
+  @observable
+  public count = 0;
+
+  constructor() {
+    super(decoratorMachine, { deferStart: false });
+    makeObservable(this);
+  }
+
+  public increment(event: SmokeEvent): void {
+    if (event.type === "INC") {
+      this.count += event.by;
+    }
+  }
+}
+
+const decoratorState: DecoratorMachineState<DecoratorStore, SmokeEvent> =
+  new DecoratorStore();
 
 const options: MachineOptions<Store, SmokeEvent> = {
   actions: {
@@ -283,6 +420,7 @@ void resetEvent;
 void incEvent;
 void invalidStringEvent;
 void removedServices;
+void decoratorState;
 `,
   );
 
@@ -297,6 +435,7 @@ void removedServices;
           strict: true,
           noEmit: true,
           skipLibCheck: true,
+          experimentalDecorators: true,
         },
         include: ["types.ts"],
       },
@@ -334,6 +473,12 @@ const main = async () => {
       cwd: consumerRoot,
     });
     run(process.execPath, [path.join(consumerRoot, "cjs.cjs")], {
+      cwd: consumerRoot,
+    });
+    run(process.execPath, [path.join(consumerRoot, "decorators-esm.mjs")], {
+      cwd: consumerRoot,
+    });
+    run(process.execPath, [path.join(consumerRoot, "decorators-cjs.cjs")], {
       cwd: consumerRoot,
     });
     run(

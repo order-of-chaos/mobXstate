@@ -6,10 +6,42 @@
   config.
 - `MobXStateMachine` starts and observes the machine through MobXstate's
   runtime.
+- `@orderofchaos/mobxstate/decorators` exports a decorator-compatible
+  `MobXStateMachine` with the same inheritance API for stores that use MobX
+  property decorators.
 - `MachineOptions<Store, Event, Typegen>` provides fallback and override
   `actions`, `guards`, `effects`, and `delays`.
 - `MachineAction`, `MachineGuard`, and `MachineEffect` describe callback
   contracts where `this` is the MobX store and the first argument is the event.
+
+## MobX Decorator Stores
+
+Use the default package entrypoint when subclasses call `makeObservable` with an
+annotation map:
+
+```ts
+import { MobXStateMachine } from "@orderofchaos/mobxstate";
+```
+
+Use the decorators entrypoint when subclasses use MobX property decorators:
+
+```ts
+import { MobXStateMachine } from "@orderofchaos/mobxstate/decorators";
+import { makeObservable, observable } from "mobx";
+
+class CounterStore extends MobXStateMachine<CounterStore, CounterEvent> {
+  @observable
+  public count = 0;
+
+  constructor() {
+    super(counterMachine);
+    makeObservable(this);
+  }
+}
+```
+
+Both entrypoints keep the same `extends MobXStateMachine<Store, Event>` store
+shape and share the same state machine runtime.
 
 ## Runtime Behavior
 

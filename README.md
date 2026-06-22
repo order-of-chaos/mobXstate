@@ -78,6 +78,13 @@ class CounterStore extends MobXStateMachine<CounterStore, CounterEvent> {
 }
 ```
 
+MobX decorator stores can keep the same `extends MobXStateMachine` shape by
+importing the decorator-compatible entrypoint:
+
+```ts
+import { MobXStateMachine } from "@orderofchaos/mobxstate/decorators";
+```
+
 ## Examples
 
 - Public live demo: https://order-of-chaos.github.io/mobXstate/

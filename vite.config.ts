@@ -4,8 +4,12 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     lib: {
-      entry: "src/index.ts",
-      fileName: (format) => `index.${format === "es" ? "mjs" : "cjs"}`,
+      entry: {
+        index: "src/index.ts",
+        decorators: "src/decorators.ts",
+      },
+      fileName: (format, entryName) =>
+        `${entryName}.${format === "es" ? "mjs" : "cjs"}`,
       formats: ["es", "cjs"],
     },
     rollupOptions: {

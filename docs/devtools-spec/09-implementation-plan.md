@@ -139,10 +139,11 @@ Definition of Done:
 - `extensions/vscode` manifest scaffold с командами extension.
 - VS Code native adapter: activation wrapper, diagnostics collection mapping,
   webview panel host, `workspace.fs.writeFile` и `WorkspaceEdit` bridge.
+- VS Code extension build config и shared framework-free webview UI builder.
 
 Порядок:
 
-1. VS Code extension bundle и shared devtools UI webview.
+1. VS Code visual editor UI в webview.
 2. WebStorm plugin shell.
 3. Zed diagnostics/typegen.
 4. Zed visual UI только после стабильной API-возможности.

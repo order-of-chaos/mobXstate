@@ -34,8 +34,12 @@ export {
 } from "./vscodeExtensionShell";
 export {
   createVscodeDevtoolsExtension,
-  createVscodeDevtoolsWebviewHtml,
 } from "./vscodeNativeAdapter";
+export {
+  createVscodeDevtoolsWebviewHtml,
+  getVscodeDevtoolsPanelTitle,
+  getVscodeDevtoolsPanelViewType,
+} from "./vscodeWebviewUi";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,

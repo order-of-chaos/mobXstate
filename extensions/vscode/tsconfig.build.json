@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true,
+    "paths": {
+      "@orderofchaos/mobxstate": ["../../dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -6,6 +6,8 @@
   "private": true,
   "publisher": "orderofchaos",
   "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json"
   },
   "engines": {
@@ -14,6 +16,7 @@
   "dependencies": {
     "@orderofchaos/mobxstate": "file:../.."
   },
+  "files": ["dist", "README.md", "package.json"],
   "categories": ["Visualization", "Other"],
   "activationEvents": [
     "onCommand:mobxstate.openViewer",

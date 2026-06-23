@@ -330,6 +330,13 @@ describe("VS Code native devtools adapter", () => {
         const html = createVscodeDevtoolsWebviewHtml(payload!);
         expect(html).toContain("MobXstate Devtools");
         expect(html).toContain("nativeAdapter");
+        expect(html).toContain('data-mobxstate-devtools-ui="vscode-webview"');
+        expect(html).toContain('data-panel-mode="visualEditor"');
+        expect(html).toContain('data-testid="state-list"');
+        expect(html).toContain('data-testid="transition-list"');
+        expect(html).toContain('data-testid="diagnostic-list"');
+        expect(html).toContain("stateCount");
+        expect(html).toContain("transitionCount");
         expect(html).not.toContain("<script>{");
         extension.dispose();
       });

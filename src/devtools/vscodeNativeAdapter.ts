@@ -4,10 +4,13 @@ import {
   type VscodeDevtoolsDiagnostic,
   type VscodeDevtoolsDisposable,
   type VscodeDevtoolsHost,
-  type VscodeDevtoolsPanelMode,
-  type VscodeDevtoolsPanelPayload,
   type VscodeDevtoolsShell,
 } from "./vscodeExtensionShell";
+import {
+  createVscodeDevtoolsWebviewHtml,
+  getVscodeDevtoolsPanelTitle,
+  getVscodeDevtoolsPanelViewType,
+} from "./vscodeWebviewUi";
 
 export interface VscodeNativeUri {
   toString(): string;
@@ -124,26 +127,6 @@ export interface VscodeNativeExtension extends VscodeDevtoolsDisposable {
   readonly diagnostics: VscodeNativeDiagnosticCollection;
 }
 
-const escapeHtml = (value: string): string => {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-};
-
-const serializePayload = (payload: VscodeDevtoolsPanelPayload): string => {
-  return JSON.stringify(payload).replace(/</g, "\\u003c");
-};
-
-const getPanelTitle = (mode: VscodeDevtoolsPanelMode): string => {
-  return mode === "viewer" ? "MobXstate Viewer" : "MobXstate Visual Editor";
-};
-
-const getPanelViewType = (mode: VscodeDevtoolsPanelMode): string => {
-  return mode === "viewer" ? "mobxstate.viewer" : "mobxstate.visualEditor";
-};
-
 const mapSeverity = (
   api: VscodeNativeApi,
   severity: VscodeDevtoolsDiagnostic["severity"],
@@ -197,83 +180,6 @@ const toNativeDiagnostic = (
   return nativeDiagnostic;
 };
 
-export const createVscodeDevtoolsWebviewHtml = (
-  payload: VscodeDevtoolsPanelPayload,
-): string => {
-  const serialized = serializePayload(payload);
-  const title = getPanelTitle(payload.mode);
-  const machineId = escapeHtml(payload.machine.id);
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    :root { color-scheme: light dark; font-family: var(--vscode-font-family, system-ui, sans-serif); }
-    body { margin: 0; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
-    main { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr); gap: 1px; min-height: 100vh; background: var(--vscode-panel-border); }
-    section { background: var(--vscode-editor-background); padding: 12px; overflow: auto; }
-    h1, h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
-    ul { margin: 0; padding: 0; list-style: none; }
-    li { padding: 5px 0; border-bottom: 1px solid var(--vscode-panel-border); font-size: 12px; }
-    .meta { color: var(--vscode-descriptionForeground); font-size: 12px; margin-bottom: 12px; }
-    .diag { color: var(--vscode-errorForeground); }
-    @media (max-width: 640px) { main { grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <script type="application/json" id="mobxstate-payload">${serialized}</script>
-  <main>
-    <section>
-      <h1>MobXstate Devtools</h1>
-      <div class="meta">${machineId}</div>
-      <h2>States</h2>
-      <ul id="states"></ul>
-    </section>
-    <section>
-      <h2>Transitions</h2>
-      <ul id="transitions"></ul>
-      <h2>Diagnostics</h2>
-      <ul id="diagnostics"></ul>
-    </section>
-  </main>
-  <script>
-    const payloadElement = document.getElementById("mobxstate-payload");
-    const statesElement = document.getElementById("states");
-    const transitionsElement = document.getElementById("transitions");
-    const diagnosticsElement = document.getElementById("diagnostics");
-
-    const renderList = (element, values, formatter) => {
-      element.replaceChildren(...values.map((value) => {
-        const item = document.createElement("li");
-        item.textContent = formatter(value);
-        return item;
-      }));
-    };
-
-    const render = (payload) => {
-      renderList(statesElement, payload.machine.graph.nodes, (node) => node.id);
-      renderList(
-        transitionsElement,
-        payload.machine.graph.edges,
-        (edge) => edge.sourcePath.join(".") + " -> " + (edge.target || "(none)")
-      );
-      renderList(
-        diagnosticsElement,
-        payload.diagnostics,
-        (diagnostic) => diagnostic.code ? diagnostic.code + ": " + diagnostic.message : diagnostic.message
-      );
-    };
-
-    render(JSON.parse(payloadElement.textContent));
-    window.addEventListener("message", (event) => render(event.data));
-  </script>
-</body>
-</html>`;
-};
-
 export const createVscodeDevtoolsExtension = (
   api: VscodeNativeApi,
   context?: VscodeNativeExtensionContext,
@@ -321,8 +227,8 @@ export const createVscodeDevtoolsExtension = (
     },
     async showPanel(payload) {
       const panel = api.window.createWebviewPanel(
-        getPanelViewType(payload.mode),
-        getPanelTitle(payload.mode),
+        getVscodeDevtoolsPanelViewType(payload.mode),
+        getVscodeDevtoolsPanelTitle(payload.mode),
         api.ViewColumn.Beside,
         {
           enableScripts: true,

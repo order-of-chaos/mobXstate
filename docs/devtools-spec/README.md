@@ -35,6 +35,9 @@ MobXstate devtools должен помогать автору видеть, за
 8. [08-source-derived-architecture-notes.md](./08-source-derived-architecture-notes.md)
    - архитектурные уроки из изученных исходников Stately/XState extension,
    применимые к MobXstate devtools.
+9. [09-implementation-plan.md](./09-implementation-plan.md) - порядок
+   реализации devtools по проверяемым слоям и Definition of Done для каждого
+   этапа.
 
 ## Принципы
 

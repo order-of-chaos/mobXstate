@@ -1,0 +1,140 @@
+# 09. План реализации
+
+## Цель
+
+Идти маленькими проверяемыми срезами: каждый этап должен давать reusable
+слой, публичные TypeScript-контракты и focused tests до перехода к следующему
+слою.
+
+## Порядок работ
+
+### Этап 1. Devtools core analyzer
+
+Статус: начат.
+
+Результат:
+
+- `analyzeMachineConfig`;
+- `machineConfigToGraph`;
+- `validateMachineConfigForDevtools`;
+- `GraphModel`, `GraphStateNode`, `GraphTransitionEdge`;
+- diagnostics без запуска пользовательского кода;
+- store binding references для actions, guards, delays и effects.
+
+Definition of Done:
+
+- analyzer строит graph из `MachineConfig`;
+- unknown initial, missing initial, deep history и unknown target дают
+  diagnostics;
+- strict mode показывает missing store implementations, если переданы
+  `MachineOptions` или store scope;
+- слой не зависит от React, IDE API и runtime actor internals.
+
+### Этап 2. Runtime bridge и viewer model
+
+Статус: начат.
+
+Результат:
+
+- `createRuntimeBridge`;
+- `createRuntimeModel`;
+- read-only runtime snapshot model;
+- active node ids;
+- event candidates для simulator controls.
+
+Definition of Done:
+
+- bridge работает с существующим `MobXStateMachine`;
+- `send`, `start`, `stop`, `restart` прокидываются без знания actor internals;
+- подписка уведомляет viewer при изменении observable state/snapshot;
+- model строится из `MachineStateValue` и `GraphModel`.
+
+### Этап 3. Simulator controls
+
+Результат:
+
+- event palette на основе `RuntimeModel.eventCandidates`;
+- отправка payloadless events;
+- ручной ввод event object;
+- snapshot history для UI.
+
+Definition of Done:
+
+- simulator не исполняет произвольный source code;
+- disabled/unknown runtime state отображается явно;
+- tests покрывают payloadless string events и object events.
+
+### Этап 4. Draft editor model
+
+Результат:
+
+- `DraftModel`;
+- команды add/rename/remove state;
+- команды add/edit/remove transition;
+- undo/redo;
+- export обратно в `MachineConfig`.
+
+Definition of Done:
+
+- editor-команды не мутируют исходный config;
+- validation запускается после каждой команды;
+- export проходит `createMachine(...)`;
+- команды можно позднее преобразовать в `SemanticEditCommand`.
+
+### Этап 5. Type compiler и CLI
+
+Результат:
+
+- сбор store binding map;
+- stable typegen printer;
+- no-op write suppression;
+- `mobxstate-devtools check`;
+- `mobxstate-devtools typegen`.
+
+Definition of Done:
+
+- compiler не выполняет пользовательский код;
+- generated output стабилен между запусками;
+- `--check` имеет non-zero exit code на errors;
+- no-op typegen не пишет файл.
+
+### Этап 6. Source reader и worker
+
+Результат:
+
+- поиск `createMachine(...)` в TypeScript;
+- `SourceDocumentCache`;
+- semantic source ranges;
+- patch preview model;
+- reparse после accepted patch.
+
+Definition of Done:
+
+- modern TypeScript fixtures покрыты;
+- unsupported syntax дает diagnostic, а не crash;
+- stale source changes не сбрасывают UI без semantic change.
+
+### Этап 7. IDE shells
+
+Порядок:
+
+1. VS Code extension.
+2. WebStorm plugin shell.
+3. Zed diagnostics/typegen.
+4. Zed visual UI только после стабильной API-возможности.
+
+Definition of Done:
+
+- IDE shells не содержат собственный analyzer/type compiler;
+- diagnostics и source edits идут через shared worker protocol;
+- accepted patches применяются только через native IDE write action.
+
+## Текущий первый milestone
+
+Milestone считается закрытым, когда в основном package есть:
+
+- devtools analyzer;
+- runtime bridge;
+- focused tests;
+- публичные экспорты из `src/index.ts`;
+- зеленые `npm test`, `npm run typecheck`, `npm run lint`.

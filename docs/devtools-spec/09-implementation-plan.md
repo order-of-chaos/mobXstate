@@ -140,10 +140,13 @@ Definition of Done:
 - VS Code native adapter: activation wrapper, diagnostics collection mapping,
   webview panel host, `workspace.fs.writeFile` и `WorkspaceEdit` bridge.
 - VS Code extension build config и shared framework-free webview UI builder.
+- Inspector-first visual editor UI: host-side `DraftModel` session,
+  `DRAFT_COMMAND`/`DRAFT_UPDATED` webview protocol, state/transition forms,
+  undo/redo и export panel.
 
 Порядок:
 
-1. VS Code visual editor UI в webview.
+1. Source patch preview для accepted editor changes.
 2. WebStorm plugin shell.
 3. Zed diagnostics/typegen.
 4. Zed visual UI только после стабильной API-возможности.

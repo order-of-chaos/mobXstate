@@ -1,5 +1,9 @@
 import type { SourceRange, SourceTextEdit } from "./sourceReader";
 import {
+  createVisualEditorSession,
+  type VisualEditorDraftCommandMessage,
+} from "./visualEditorSession";
+import {
   createVscodeDevtoolsShell,
   type VscodeDevtoolsDiagnostic,
   type VscodeDevtoolsDisposable,
@@ -47,6 +51,9 @@ export interface VscodeNativeTextEditor {
 export interface VscodeNativeWebview {
   html: string;
   postMessage(message: unknown): boolean | Promise<boolean>;
+  onDidReceiveMessage?(
+    listener: (message: unknown) => void | Promise<void>,
+  ): VscodeDevtoolsDisposable;
 }
 
 export interface VscodeNativeWebviewPanel extends VscodeDevtoolsDisposable {
@@ -239,6 +246,17 @@ export const createVscodeDevtoolsExtension = (
       context?.subscriptions.push(panel);
       panel.webview.html = createVscodeDevtoolsWebviewHtml(payload);
       await panel.webview.postMessage(payload);
+
+      if (payload.mode === "visualEditor" && panel.webview.onDidReceiveMessage) {
+        const session = createVisualEditorSession(payload.machine.config);
+        const disposable = panel.webview.onDidReceiveMessage(async (message) => {
+          await panel.webview.postMessage(
+            session.handleMessage(message as VisualEditorDraftCommandMessage),
+          );
+        });
+        context?.subscriptions.push(disposable);
+        await panel.webview.postMessage(session.getSnapshot());
+      }
     },
     async writeFile(uri, text) {
       await api.workspace.fs.writeFile(parseUri(uri), new TextEncoder().encode(text));

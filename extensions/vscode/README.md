@@ -18,7 +18,8 @@ Analyzer, source reader, type compiler и worker protocol не должны
 дублироваться внутри extension adapter.
 
 Текущий срез содержит manifest команд, `src/extension.ts`, webview host,
-shared webview UI builder, adapter-level smoke tests через fake VS Code API и
+shared webview UI builder, Inspector-first visual editor controls,
+adapter-level smoke tests через fake VS Code API и
 `npm --prefix extensions/vscode run build` для генерации `dist/extension.js`.
-Следующий срез должен заменить framework-free webview на полноценный visual
-editor UI.
+Следующий срез должен добавить source patch preview для accepted editor
+changes.

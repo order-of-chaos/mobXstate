@@ -117,7 +117,8 @@ const createFakeVscode = () => {
     readonly viewType: string;
     readonly title: string;
     readonly html: string;
-    readonly messages: VscodeDevtoolsPanelPayload[];
+    readonly messages: unknown[];
+    receive(message: unknown): void;
   }> = [];
   const writes: Array<{ readonly uri: string; readonly text: string }> = [];
   const appliedEdits: FakeWorkspaceEdit[] = [];
@@ -151,12 +152,16 @@ const createFakeVscode = () => {
         document,
       },
       createWebviewPanel(viewType: string, title: string) {
-        const messages: VscodeDevtoolsPanelPayload[] = [];
+        const messages: unknown[] = [];
+        const listeners: Array<(message: unknown) => void> = [];
         const panel = {
           viewType,
           title,
           html: "",
           messages,
+          receive(message: unknown) {
+            listeners.forEach((listener) => listener(message));
+          },
         };
         panels.push(panel);
         return {
@@ -167,9 +172,20 @@ const createFakeVscode = () => {
             get html() {
               return panel.html;
             },
-            postMessage(message: VscodeDevtoolsPanelPayload) {
+            postMessage(message: unknown) {
               messages.push(message);
               return Promise.resolve(true);
+            },
+            onDidReceiveMessage(listener: (message: unknown) => void) {
+              listeners.push(listener);
+              return {
+                dispose() {
+                  const index = listeners.indexOf(listener);
+                  if (index >= 0) {
+                    listeners.splice(index, 1);
+                  }
+                },
+              };
             },
           },
           dispose() {
@@ -270,8 +286,12 @@ describe("VS Code native devtools adapter", () => {
     expect(panel?.viewType).toBe("mobxstate.viewer");
     expect(panel?.title).toBe("MobXstate Viewer");
     expect(panel?.html).toContain("nativeAdapter");
-    expect(panel?.messages[0]?.type).toBe("LOAD_MACHINE");
-    expect(panel?.messages[0]?.machine.id).toBe("nativeAdapter");
+    expect((panel?.messages[0] as VscodeDevtoolsPanelPayload | undefined)?.type).toBe(
+      "LOAD_MACHINE",
+    );
+    expect(
+      (panel?.messages[0] as VscodeDevtoolsPanelPayload | undefined)?.machine.id,
+    ).toBe("nativeAdapter");
   });
 
   it("writes typegen through native workspace fs", async () => {
@@ -327,7 +347,9 @@ describe("VS Code native devtools adapter", () => {
       .then(() => {
         const payload = harness.panels[0]?.messages[0];
         expect(payload).toBeDefined();
-        const html = createVscodeDevtoolsWebviewHtml(payload!);
+        const html = createVscodeDevtoolsWebviewHtml(
+          payload as VscodeDevtoolsPanelPayload,
+        );
         expect(html).toContain("MobXstate Devtools");
         expect(html).toContain("nativeAdapter");
         expect(html).toContain('data-mobxstate-devtools-ui="vscode-webview"');
@@ -335,10 +357,45 @@ describe("VS Code native devtools adapter", () => {
         expect(html).toContain('data-testid="state-list"');
         expect(html).toContain('data-testid="transition-list"');
         expect(html).toContain('data-testid="diagnostic-list"');
+        expect(html).toContain('data-testid="editor-toolbar"');
+        expect(html).toContain('data-testid="state-inspector-form"');
+        expect(html).toContain('data-testid="transition-inspector-form"');
+        expect(html).toContain('data-testid="export-panel"');
+        expect(html).toContain('data-editor-command="addState"');
+        expect(html).toContain('data-editor-command="addTransition"');
+        expect(html).toContain('data-editor-command="undo"');
+        expect(html).toContain('data-editor-command="redo"');
         expect(html).toContain("stateCount");
         expect(html).toContain("transitionCount");
         expect(html).not.toContain("<script>{");
         extension.dispose();
       });
+  });
+
+  it("routes visual editor draft commands through the native webview bridge", async () => {
+    const harness = createFakeVscode();
+    createVscodeDevtoolsExtension(harness.api, harness.context);
+
+    await harness.commands.get(vscodeDevtoolsCommandIds.openVisualEditor)?.();
+    const [panel] = harness.panels;
+    expect(panel).toBeDefined();
+
+    panel?.receive({
+      type: "DRAFT_COMMAND",
+      command: "addState",
+      params: {
+        parentPath: [],
+        key: "drafted",
+      },
+    });
+
+    const lastMessage = panel?.messages[panel.messages.length - 1] as
+      | { readonly type?: string; readonly graph?: { readonly nodes: readonly { readonly id: string }[] } }
+      | undefined;
+
+    expect(lastMessage?.type).toBe("DRAFT_UPDATED");
+    expect(lastMessage?.graph?.nodes.map((node) => node.id)).toContain(
+      "nativeAdapter.drafted",
+    );
   });
 });

@@ -228,6 +228,33 @@ export const createVscodeDevtoolsWebviewHtml = (
       line-height: 15px;
     }
 
+    .editor-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .tool-button {
+      min-height: 28px;
+      padding: 4px 9px;
+      border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
+      border-radius: 6px;
+      color: var(--vscode-button-foreground);
+      background: var(--vscode-button-background);
+      cursor: pointer;
+    }
+
+    .tool-button.secondary {
+      color: var(--vscode-foreground);
+      background: var(--vscode-button-secondaryBackground, var(--vscode-sideBar-background));
+    }
+
+    .tool-button:disabled {
+      opacity: 0.48;
+      cursor: default;
+    }
+
     .inspector {
       min-height: 160px;
       padding: 10px;
@@ -250,6 +277,41 @@ export const createVscodeDevtoolsWebviewHtml = (
     .inspector dd {
       margin: 0;
       overflow-wrap: anywhere;
+    }
+
+    .editor-form {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--vscode-panel-border);
+    }
+
+    .editor-form label {
+      display: grid;
+      gap: 3px;
+      color: var(--vscode-descriptionForeground);
+      font-size: 11px;
+    }
+
+    .editor-form input,
+    .editor-form select,
+    .editor-form textarea {
+      width: 100%;
+      min-height: 28px;
+      padding: 4px 6px;
+      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+      border-radius: 4px;
+      color: var(--vscode-input-foreground);
+      background: var(--vscode-input-background);
+      font: inherit;
+    }
+
+    .editor-form textarea {
+      min-height: 126px;
+      resize: vertical;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: var(--vscode-editor-font-size, 12px);
     }
 
     .diagnostic {
@@ -298,18 +360,83 @@ export const createVscodeDevtoolsWebviewHtml = (
         <ul class="list" data-testid="state-list" id="state-list"></ul>
       </aside>
       <section class="pane">
+        <div class="editor-toolbar" data-testid="editor-toolbar">
+          <button class="tool-button secondary" type="button" data-editor-command="undo" id="undo-button">Undo</button>
+          <button class="tool-button secondary" type="button" data-editor-command="redo" id="redo-button">Redo</button>
+          <button class="tool-button" type="button" data-editor-command="export" id="focus-export-button">Export</button>
+        </div>
         <div class="stats" id="stats"></div>
         <div class="pane-header">
           <h2>Transitions</h2>
           <span class="count" id="transition-count"></span>
         </div>
         <ul class="list" data-testid="transition-list" id="transition-list"></ul>
+        <form class="editor-form" data-testid="transition-inspector-form" id="transition-form">
+          <h2>Transition</h2>
+          <label>Source path
+            <input name="sourcePath" autocomplete="off" placeholder="idle">
+          </label>
+          <label>Trigger kind
+            <select name="triggerKind">
+              <option value="on">on</option>
+              <option value="after">after</option>
+              <option value="always">always</option>
+              <option value="onDone">onDone</option>
+              <option value="onError">onError</option>
+            </select>
+          </label>
+          <label>Trigger key
+            <input name="triggerKey" autocomplete="off" placeholder="START">
+          </label>
+          <label>Target
+            <input name="target" autocomplete="off" placeholder="loading">
+          </label>
+          <label>Actions
+            <input name="actions" autocomplete="off" placeholder="recordStart">
+          </label>
+          <label>Guard
+            <input name="cond" autocomplete="off" placeholder="canStart">
+          </label>
+          <button class="tool-button" type="submit" data-editor-command="addTransition">Add transition</button>
+          <button class="tool-button secondary" type="button" data-editor-command="updateTransition" id="update-transition-button">Update selected</button>
+          <button class="tool-button secondary" type="button" data-editor-command="removeTransition" id="remove-transition-button">Remove selected</button>
+        </form>
       </section>
       <aside class="pane">
         <div class="pane-header">
           <h2>Inspector</h2>
         </div>
         <section class="inspector" id="inspector"></section>
+        <form class="editor-form" data-testid="state-inspector-form" id="state-form">
+          <h2>State</h2>
+          <label>Parent path
+            <input name="parentPath" autocomplete="off" placeholder="checkout.payment">
+          </label>
+          <label>State key
+            <input name="key" autocomplete="off" placeholder="loading">
+          </label>
+          <label>Rename selected to
+            <input name="renameKey" autocomplete="off" placeholder="pending">
+          </label>
+          <label>State type
+            <select name="stateType">
+              <option value="">auto</option>
+              <option value="atomic">atomic</option>
+              <option value="compound">compound</option>
+              <option value="parallel">parallel</option>
+              <option value="final">final</option>
+              <option value="history">history</option>
+            </select>
+          </label>
+          <button class="tool-button" type="submit" data-editor-command="addState">Add state</button>
+          <button class="tool-button secondary" type="button" data-editor-command="renameState" id="rename-state-button">Rename selected</button>
+          <button class="tool-button secondary" type="button" data-editor-command="removeState" id="remove-state-button">Remove selected</button>
+          <button class="tool-button secondary" type="button" data-editor-command="setStateType" id="set-state-type-button">Set type</button>
+        </form>
+        <form class="editor-form" data-testid="export-panel" id="export-form">
+          <h2>Export</h2>
+          <textarea readonly id="export-output" spellcheck="false"></textarea>
+        </form>
         <div class="pane-header">
           <h2>Diagnostics</h2>
           <span class="count" id="diagnostic-count"></span>
@@ -329,12 +456,41 @@ export const createVscodeDevtoolsWebviewHtml = (
     const diagnosticCountElement = document.getElementById("diagnostic-count");
     const inspectorElement = document.getElementById("inspector");
     const statsElement = document.getElementById("stats");
+    const stateFormElement = document.getElementById("state-form");
+    const transitionFormElement = document.getElementById("transition-form");
+    const exportOutputElement = document.getElementById("export-output");
+    const undoButtonElement = document.getElementById("undo-button");
+    const redoButtonElement = document.getElementById("redo-button");
+    const renameStateButtonElement = document.getElementById("rename-state-button");
+    const removeStateButtonElement = document.getElementById("remove-state-button");
+    const setStateTypeButtonElement = document.getElementById("set-state-type-button");
+    const updateTransitionButtonElement = document.getElementById("update-transition-button");
+    const removeTransitionButtonElement = document.getElementById("remove-transition-button");
+    const focusExportButtonElement = document.getElementById("focus-export-button");
     const modeTabElements = Array.from(document.querySelectorAll("[data-mode]"));
+    const vscodeApi = typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined;
     let selectedNodeId = "";
+    let selectedEdgeId = "";
+    let latestDraft = undefined;
 
     const clear = (element) => element.replaceChildren();
     const text = (value) => value === undefined || value === null || value === "" ? "(none)" : String(value);
     const pathText = (path) => path && path.length > 0 ? path.join(".") : "(root)";
+    const parsePath = (value) => value.split(".").map((part) => part.trim()).filter(Boolean);
+    const serializePath = (path) => path && path.length > 0 ? path.join(".") : "";
+    const formValue = (form, name) => String(new FormData(form).get(name) || "").trim();
+
+    const postDraftCommand = (command, params) => {
+      if (!vscodeApi) {
+        return;
+      }
+
+      vscodeApi.postMessage({
+        type: "DRAFT_COMMAND",
+        command,
+        params,
+      });
+    };
 
     const createListButton = (title, meta, selected, onClick) => {
       const item = document.createElement("li");
@@ -377,10 +533,10 @@ export const createVscodeDevtoolsWebviewHtml = (
       inspectorElement.append(list);
     };
 
-    const renderStats = (payload) => {
-      const stateCount = payload.machine.graph.nodes.length;
-      const transitionCount = payload.machine.graph.edges.length;
-      const diagnosticCount = payload.diagnostics.length;
+    const renderStats = (graph, diagnostics) => {
+      const stateCount = graph.nodes.length;
+      const transitionCount = graph.edges.length;
+      const diagnosticCount = diagnostics.length;
       const values = [
         ["stateCount", stateCount, "states"],
         ["transitionCount", transitionCount, "transitions"],
@@ -402,20 +558,49 @@ export const createVscodeDevtoolsWebviewHtml = (
     };
 
     const render = (payload) => {
-      const nodes = payload.machine.graph.nodes;
-      const edges = payload.machine.graph.edges;
-      const diagnostics = payload.diagnostics;
+      const isDraftUpdate = payload.type === "DRAFT_UPDATED";
+      const graph = isDraftUpdate ? payload.graph : payload.machine.graph;
+      const nodes = graph.nodes;
+      const edges = graph.edges;
+      const diagnostics = isDraftUpdate ? payload.diagnostics : payload.diagnostics;
+      latestDraft = isDraftUpdate ? payload : latestDraft;
       selectedNodeId = selectedNodeId || (nodes[0] ? nodes[0].id : "");
       const selectedNode = nodes.find((node) => node.id === selectedNodeId) || nodes[0];
+      const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId) || edges[0];
+      selectedEdgeId = selectedEdge ? selectedEdge.id : "";
 
-      rootElement.dataset.panelMode = payload.mode;
+      const panelMode = isDraftUpdate ? rootElement.dataset.panelMode : payload.mode;
+      rootElement.dataset.panelMode = panelMode;
       modeTabElements.forEach((button) => {
-        button.setAttribute("aria-selected", button.dataset.mode === payload.mode ? "true" : "false");
+        button.setAttribute("aria-selected", button.dataset.mode === panelMode ? "true" : "false");
       });
       stateCountElement.textContent = String(nodes.length);
       transitionCountElement.textContent = String(edges.length);
       diagnosticCountElement.textContent = String(diagnostics.length);
-      renderStats(payload);
+      renderStats(graph, diagnostics);
+      undoButtonElement.disabled = isDraftUpdate ? !payload.canUndo : true;
+      redoButtonElement.disabled = isDraftUpdate ? !payload.canRedo : true;
+      renameStateButtonElement.disabled = !selectedNode;
+      removeStateButtonElement.disabled = !selectedNode || selectedNode.path.length === 0;
+      setStateTypeButtonElement.disabled = !selectedNode;
+      updateTransitionButtonElement.disabled = !selectedEdge;
+      removeTransitionButtonElement.disabled = !selectedEdge;
+      exportOutputElement.value = isDraftUpdate ? payload.exportText : "";
+
+      if (selectedNode) {
+        stateFormElement.elements.parentPath.value = serializePath(selectedNode.path.slice(0, -1));
+        stateFormElement.elements.renameKey.value = selectedNode.key;
+        stateFormElement.elements.stateType.value = selectedNode.declaredType || selectedNode.type || "";
+      }
+
+      if (selectedEdge) {
+        transitionFormElement.elements.sourcePath.value = serializePath(selectedEdge.sourcePath);
+        transitionFormElement.elements.triggerKind.value = selectedEdge.trigger.kind;
+        transitionFormElement.elements.triggerKey.value = selectedEdge.trigger.key || "";
+        transitionFormElement.elements.target.value = selectedEdge.target || "";
+        transitionFormElement.elements.actions.value = selectedEdge.actions.join(", ");
+        transitionFormElement.elements.cond.value = selectedEdge.guard || "";
+      }
 
       clear(stateListElement);
       nodes.forEach((node) => {
@@ -441,8 +626,11 @@ export const createVscodeDevtoolsWebviewHtml = (
           transitionListElement.append(createListButton(
             pathText(edge.sourcePath) + " -> " + text(edge.target),
             edge.trigger.kind + (edge.trigger.key ? " " + edge.trigger.key : ""),
-            false,
-            () => undefined
+            edge.id === selectedEdgeId,
+            () => {
+              selectedEdgeId = edge.id;
+              render(payload);
+            }
           ));
         });
       }
@@ -468,6 +656,86 @@ export const createVscodeDevtoolsWebviewHtml = (
 
       renderInspector(selectedNode);
     };
+
+    undoButtonElement.addEventListener("click", () => postDraftCommand("undo"));
+    redoButtonElement.addEventListener("click", () => postDraftCommand("redo"));
+    focusExportButtonElement.addEventListener("click", () => exportOutputElement.focus());
+
+    stateFormElement.addEventListener("submit", (event) => {
+      event.preventDefault();
+      postDraftCommand("addState", {
+        parentPath: parsePath(formValue(stateFormElement, "parentPath")),
+        key: formValue(stateFormElement, "key"),
+      });
+    });
+
+    renameStateButtonElement.addEventListener("click", () => {
+      const selected = latestDraft?.graph.nodes.find((node) => node.id === selectedNodeId);
+      if (!selected) {
+        return;
+      }
+
+      postDraftCommand("renameState", {
+        path: selected.path,
+        newKey: formValue(stateFormElement, "renameKey"),
+      });
+    });
+
+    removeStateButtonElement.addEventListener("click", () => {
+      const selected = latestDraft?.graph.nodes.find((node) => node.id === selectedNodeId);
+      if (selected) {
+        postDraftCommand("removeState", { path: selected.path });
+      }
+    });
+
+    setStateTypeButtonElement.addEventListener("click", () => {
+      const selected = latestDraft?.graph.nodes.find((node) => node.id === selectedNodeId);
+      if (!selected) {
+        return;
+      }
+
+      postDraftCommand("setStateType", {
+        path: selected.path,
+        type: formValue(stateFormElement, "stateType"),
+      });
+    });
+
+    transitionFormElement.addEventListener("submit", (event) => {
+      event.preventDefault();
+      postDraftCommand("addTransition", {
+        sourcePath: parsePath(formValue(transitionFormElement, "sourcePath")),
+        trigger: {
+          kind: formValue(transitionFormElement, "triggerKind"),
+          key: formValue(transitionFormElement, "triggerKey"),
+        },
+        transition: {
+          target: formValue(transitionFormElement, "target"),
+          actions: formValue(transitionFormElement, "actions"),
+          cond: formValue(transitionFormElement, "cond"),
+        },
+      });
+    });
+
+    updateTransitionButtonElement.addEventListener("click", () => {
+      if (!selectedEdgeId) {
+        return;
+      }
+
+      postDraftCommand("updateTransition", {
+        edgeId: selectedEdgeId,
+        patch: {
+          target: formValue(transitionFormElement, "target"),
+          actions: formValue(transitionFormElement, "actions"),
+          cond: formValue(transitionFormElement, "cond"),
+        },
+      });
+    });
+
+    removeTransitionButtonElement.addEventListener("click", () => {
+      if (selectedEdgeId) {
+        postDraftCommand("removeTransition", { edgeId: selectedEdgeId });
+      }
+    });
 
     render(JSON.parse(payloadElement.textContent));
     window.addEventListener("message", (event) => render(event.data));

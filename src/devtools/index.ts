@@ -40,6 +40,10 @@ export {
   getVscodeDevtoolsPanelTitle,
   getVscodeDevtoolsPanelViewType,
 } from "./vscodeWebviewUi";
+export {
+  createVisualEditorSession,
+  formatVisualEditorExport,
+} from "./visualEditorSession";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -149,3 +153,9 @@ export type {
   VscodeNativeWebviewPanel,
   VscodeNativeWorkspaceEdit,
 } from "./vscodeNativeAdapter";
+export type {
+  VisualEditorDraftCommandMessage,
+  VisualEditorDraftCommandName,
+  VisualEditorDraftSnapshot,
+  VisualEditorSession,
+} from "./visualEditorSession";

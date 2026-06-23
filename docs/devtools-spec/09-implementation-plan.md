@@ -106,7 +106,7 @@ Definition of Done:
 
 ### Этап 6. Source reader и worker
 
-Статус: следующий этап.
+Статус: готово.
 
 Результат:
 
@@ -123,6 +123,8 @@ Definition of Done:
 - stale source changes не сбрасывают UI без semantic change.
 
 ### Этап 7. IDE shells
+
+Статус: следующий этап.
 
 Порядок:
 
@@ -146,6 +148,7 @@ Milestone считается закрытым, когда в основном pa
 - simulator controller;
 - draft editor model;
 - type compiler и local CLI;
+- source reader и source document cache;
 - focused tests;
 - публичные экспорты из `src/index.ts`;
 - зеленые `npm test`, `npm run typecheck`, `npm run lint`.

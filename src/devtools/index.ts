@@ -17,6 +17,12 @@ export {
   printTypegenModule,
   shouldWriteTypegenFile,
 } from "./typeCompiler";
+export {
+  createDevtoolsSourceWorker,
+  createSourceDocumentCache,
+  findCreateMachineCalls,
+  readMachineConfigAst,
+} from "./sourceReader";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -64,3 +70,20 @@ export type {
   TypegenResult,
   TypegenWriteDecision,
 } from "./typeCompiler";
+export type {
+  DevtoolsSourceWorker,
+  SourceBindingRange,
+  SourceDiagnostic,
+  SourceDocumentCache,
+  SourceDocumentSnapshot,
+  SourceDocumentUpdate,
+  SourceDocumentUpdateKind,
+  SourceMachine,
+  SourceMachineRanges,
+  SourcePropertyRange,
+  SourceRange,
+  SourceReadResult,
+  SourceStateRange,
+  SourceTextEdit,
+  SourceTransitionRange,
+} from "./sourceReader";

@@ -5,6 +5,10 @@ export {
   validateMachineConfigForDevtools,
 } from "./machineAnalyzer";
 export { createRuntimeBridge, createRuntimeModel } from "./runtimeBridge";
+export {
+  createSimulatorController,
+  createSimulatorEventPalette,
+} from "./simulator";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -25,3 +29,12 @@ export type {
   RuntimeModel,
   RuntimeModelStatus,
 } from "./runtimeBridge";
+export type {
+  SimulatorController,
+  SimulatorControllerOptions,
+  SimulatorEventCandidate,
+  SimulatorHistoryEntry,
+  SimulatorSendFailure,
+  SimulatorSendResult,
+  SimulatorSendSuccess,
+} from "./simulator";

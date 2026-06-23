@@ -10,7 +10,7 @@
 
 ### Этап 1. Devtools core analyzer
 
-Статус: начат.
+Статус: готово.
 
 Результат:
 
@@ -32,7 +32,7 @@ Definition of Done:
 
 ### Этап 2. Runtime bridge и viewer model
 
-Статус: начат.
+Статус: готово.
 
 Результат:
 
@@ -51,6 +51,8 @@ Definition of Done:
 
 ### Этап 3. Simulator controls
 
+Статус: готово.
+
 Результат:
 
 - event palette на основе `RuntimeModel.eventCandidates`;
@@ -65,6 +67,8 @@ Definition of Done:
 - tests покрывают payloadless string events и object events.
 
 ### Этап 4. Draft editor model
+
+Статус: следующий этап.
 
 Результат:
 
@@ -135,6 +139,7 @@ Milestone считается закрытым, когда в основном pa
 
 - devtools analyzer;
 - runtime bridge;
+- simulator controller;
 - focused tests;
 - публичные экспорты из `src/index.ts`;
 - зеленые `npm test`, `npm run typecheck`, `npm run lint`.

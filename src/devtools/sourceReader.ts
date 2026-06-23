@@ -25,6 +25,7 @@ export interface SourceDiagnostic {
 
 export interface SourcePropertyRange {
   readonly path: readonly string[];
+  readonly value: unknown;
   readonly range: SourceRange;
   readonly keyRange: SourceRange;
   readonly valueRange: SourceRange;
@@ -410,12 +411,14 @@ class SafeObjectLiteralParser {
       this.index += 1;
       const valueStart = skipTrivia(this.text, this.index);
       this.index = valueStart;
-      value[key] = this.parseValue([...path, key]);
+      const propertyValue = this.parseValue([...path, key]);
+      value[key] = propertyValue;
       this.index = this.skipTypeSuffixes(this.index);
       const valueEnd = this.index;
 
       this.propertyRanges.push({
         path: [...path, key],
+        value: propertyValue,
         range: createRange(keyStart, valueEnd),
         keyRange: createRange(keyStart, keyEnd),
         valueRange: createRange(valueStart, valueEnd),
@@ -812,11 +815,13 @@ const getBindingRange = (
   property: SourcePropertyRange,
 ): SourceBindingRange | undefined => {
   const last = property.path[property.path.length - 1];
+  const name = typeof property.value === "string" ? property.value : undefined;
 
   if (last === "entry" || last === "exit" || last === "actions") {
     return {
       path: getStatePathFromPropertyPath(property.path.slice(0, -1)) ?? [],
       kind: "action",
+      ...(name === undefined ? {} : { name }),
       range: property.range,
     };
   }
@@ -825,6 +830,7 @@ const getBindingRange = (
     return {
       path: getStatePathFromPropertyPath(property.path.slice(0, -1)) ?? [],
       kind: "guard",
+      ...(name === undefined ? {} : { name }),
       range: property.range,
     };
   }
@@ -842,6 +848,7 @@ const getBindingRange = (
     return {
       path: getStatePathFromPropertyPath(property.path.slice(0, -1)) ?? [],
       kind: "effect",
+      ...(name === undefined ? {} : { name }),
       range: property.range,
     };
   }

@@ -23,6 +23,10 @@ export {
   findCreateMachineCalls,
   readMachineConfigAst,
 } from "./sourceReader";
+export {
+  createDevtoolsWorkerProtocol,
+  devtoolsWorkerProtocolVersion,
+} from "./workerProtocol";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -87,3 +91,21 @@ export type {
   SourceTextEdit,
   SourceTransitionRange,
 } from "./sourceReader";
+export type {
+  AnalyzeFileParams,
+  ApplyAcceptedTextEditsParams,
+  DevtoolsWorkerError,
+  DevtoolsWorkerErrorResponse,
+  DevtoolsWorkerMethod,
+  DevtoolsWorkerProtocol,
+  DevtoolsWorkerProtocolVersion,
+  DevtoolsWorkerRequest,
+  DevtoolsWorkerResponse,
+  DevtoolsWorkerSuccessResponse,
+  FormattedExport,
+  GetNodePositionParams,
+  GetStoreBindingPositionParams,
+  MachineSelectorParams,
+  SetDisplayedMachineParams,
+  UpdateDocumentParams,
+} from "./workerProtocol";

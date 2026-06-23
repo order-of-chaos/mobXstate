@@ -124,7 +124,16 @@ Definition of Done:
 
 ### Этап 7. IDE shells
 
-Статус: следующий этап.
+Статус: начат.
+
+Готово в текущем срезе:
+
+- shared worker protocol поверх source reader и type compiler;
+- методы `analyzeFile`, `updateDocument`, `setDisplayedMachine`, `getMachine`,
+  `compileTypegen`, `applyAcceptedTextEdits`;
+- source navigation методы для state node и store binding ranges;
+- formatting/export и close document commands;
+- focused tests для worker protocol contract.
 
 Порядок:
 
@@ -149,6 +158,7 @@ Milestone считается закрытым, когда в основном pa
 - draft editor model;
 - type compiler и local CLI;
 - source reader и source document cache;
+- shared worker protocol для IDE shells;
 - focused tests;
 - публичные экспорты из `src/index.ts`;
 - зеленые `npm test`, `npm run typecheck`, `npm run lint`.

@@ -55,7 +55,7 @@
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "dev": "vite",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false && tsc -p tsconfig.test.json && tsc -p tsconfig.type-tests.json && tsc -p tsconfig.examples.json",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false && tsc -p tsconfig.test.json && tsc -p tsconfig.type-tests.json && tsc -p tsconfig.examples.json && tsc -p extensions/vscode/tsconfig.json",
     "build": "npm run clean && tsc && vite build",
     "devtools": "node scripts/mobxstate-devtools.mjs",
     "pages:build": "node ./scripts/build-pages.mjs",

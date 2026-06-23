@@ -5,8 +5,14 @@
   "version": "0.0.1",
   "private": true,
   "publisher": "orderofchaos",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
   "engines": {
     "vscode": "^1.90.0"
+  },
+  "dependencies": {
+    "@orderofchaos/mobxstate": "file:../.."
   },
   "categories": ["Visualization", "Other"],
   "activationEvents": [

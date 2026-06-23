@@ -3,8 +3,9 @@
 Этот каталог фиксирует packaging boundary для VS Code extension.
 
 Общая командная логика уже находится в
-`src/devtools/vscodeExtensionShell.ts`. Реальный VS Code adapter должен только
-перевести native API в `VscodeDevtoolsHost`:
+`src/devtools/vscodeExtensionShell.ts`, а native bridge находится в
+`src/devtools/vscodeNativeAdapter.ts`. Локальный `src/extension.ts` только
+передает настоящий VS Code API в этот bridge.
 
 - `window.activeTextEditor.document` -> `getActiveDocument`;
 - `commands.registerCommand` -> `registerCommand`;
@@ -16,5 +17,6 @@
 Analyzer, source reader, type compiler и worker protocol не должны
 дублироваться внутри extension adapter.
 
-Текущий scaffold содержит manifest команд. Следующий срез должен добавить
-`src/extension.ts`, webview host и smoke tests adapter-level wiring.
+Текущий срез содержит manifest команд, `src/extension.ts`, webview host и
+adapter-level smoke tests через fake VS Code API. Следующий срез должен собрать
+extension bundle и заменить placeholder webview HTML на общий devtools UI.

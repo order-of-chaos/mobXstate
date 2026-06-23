@@ -32,6 +32,10 @@ export {
   getVscodeDevtoolsTypegenUri,
   vscodeDevtoolsCommandIds,
 } from "./vscodeExtensionShell";
+export {
+  createVscodeDevtoolsExtension,
+  createVscodeDevtoolsWebviewHtml,
+} from "./vscodeNativeAdapter";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -126,3 +130,18 @@ export type {
   VscodeDevtoolsPanelPayload,
   VscodeDevtoolsShell,
 } from "./vscodeExtensionShell";
+export type {
+  VscodeNativeApi,
+  VscodeNativeDiagnostic,
+  VscodeNativeDiagnosticCollection,
+  VscodeNativeExtension,
+  VscodeNativeExtensionContext,
+  VscodeNativePosition,
+  VscodeNativeRange,
+  VscodeNativeTextDocument,
+  VscodeNativeTextEditor,
+  VscodeNativeUri,
+  VscodeNativeWebview,
+  VscodeNativeWebviewPanel,
+  VscodeNativeWorkspaceEdit,
+} from "./vscodeNativeAdapter";

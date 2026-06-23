@@ -137,10 +137,12 @@ Definition of Done:
 - VS Code shell core для команд, diagnostics, panel payload, typegen write и
   accepted edits через native host boundary;
 - `extensions/vscode` manifest scaffold с командами extension.
+- VS Code native adapter: activation wrapper, diagnostics collection mapping,
+  webview panel host, `workspace.fs.writeFile` и `WorkspaceEdit` bridge.
 
 Порядок:
 
-1. VS Code native adapter и webview host.
+1. VS Code extension bundle и shared devtools UI webview.
 2. WebStorm plugin shell.
 3. Zed diagnostics/typegen.
 4. Zed visual UI только после стабильной API-возможности.

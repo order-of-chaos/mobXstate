@@ -9,6 +9,7 @@ export {
   createSimulatorController,
   createSimulatorEventPalette,
 } from "./simulator";
+export { createDraftModel, validateDraftConfig } from "./draftModel";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -38,3 +39,12 @@ export type {
   SimulatorSendResult,
   SimulatorSendSuccess,
 } from "./simulator";
+export type {
+  DraftCommandFailure,
+  DraftCommandResult,
+  DraftCommandSuccess,
+  DraftCommandType,
+  DraftModel,
+  DraftTransitionPatch,
+  DraftTransitionTrigger,
+} from "./draftModel";

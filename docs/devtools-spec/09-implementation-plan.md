@@ -68,7 +68,7 @@ Definition of Done:
 
 ### Этап 4. Draft editor model
 
-Статус: следующий этап.
+Статус: готово.
 
 Результат:
 
@@ -86,6 +86,8 @@ Definition of Done:
 - команды можно позднее преобразовать в `SemanticEditCommand`.
 
 ### Этап 5. Type compiler и CLI
+
+Статус: следующий этап.
 
 Результат:
 
@@ -140,6 +142,7 @@ Milestone считается закрытым, когда в основном pa
 - devtools analyzer;
 - runtime bridge;
 - simulator controller;
+- draft editor model;
 - focused tests;
 - публичные экспорты из `src/index.ts`;
 - зеленые `npm test`, `npm run typecheck`, `npm run lint`.

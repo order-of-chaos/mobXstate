@@ -92,6 +92,27 @@ interface DraftUpdatedPayload {
   readonly error?: string;
 }
 
+interface SourcePatchPreviewPayload {
+  readonly type: "SOURCE_PATCH_PREVIEW";
+  readonly patch: {
+    readonly id: string;
+    readonly title: string;
+    readonly previewText: string;
+  };
+}
+
+interface SourcePatchAppliedPayload {
+  readonly type: "SOURCE_PATCH_APPLIED";
+  readonly patchId: string;
+  readonly machine: PanelPayload["machine"];
+  readonly diagnostics?: readonly Diagnostic[];
+}
+
+interface SourcePatchStatusPayload {
+  readonly type: "SOURCE_PATCH_UNAVAILABLE" | "SOURCE_PATCH_ERROR";
+  readonly message: string;
+}
+
 interface VscodeApi {
   postMessage(message: unknown): void;
 }
@@ -117,6 +138,11 @@ interface TransitionFormValue {
 interface StateNodeData extends Record<string, unknown> {
   readonly node: GraphStateNode;
   readonly active: boolean;
+  readonly canEdit: boolean;
+  readonly onAddConnectedState: (
+    node: GraphStateNode,
+    direction: FlowDirection,
+  ) => void;
 }
 
 interface TransitionEdgeData extends Record<string, unknown> {
@@ -152,6 +178,8 @@ interface FlowLabelSize {
 }
 
 type HandleSide = "top" | "right" | "bottom" | "left";
+
+type FlowDirection = "top" | "right" | "bottom" | "left";
 
 const handleSides: ReadonlyArray<{
   readonly id: HandleSide;
@@ -193,6 +221,24 @@ const serializePath = (path: readonly string[] | undefined): string => {
 
 const getNodeId = (graphId: string, path: readonly string[]): string => {
   return path.length === 0 ? graphId : `${graphId}.${path.join(".")}`;
+};
+
+const pathEquals = (
+  left: readonly string[],
+  right: readonly string[],
+): boolean => {
+  return left.length === right.length && left.every((part, index) => part === right[index]);
+};
+
+const getTransitionEdgeId = (
+  graphId: string,
+  sourcePath: readonly string[],
+  triggerKind: TransitionKind,
+  triggerKey: string | undefined,
+  index = 0,
+): string => {
+  const key = triggerKey ?? triggerKind;
+  return `${getNodeId(graphId, sourcePath)}:${triggerKind}:${key}:${index}`;
 };
 
 const getEdgeLabel = (edge: GraphTransitionEdge): string => {
@@ -244,6 +290,94 @@ const getNodeCenter = (position: XYPosition): XYPosition => {
     x: position.x + stateNodeSize.width / 2,
     y: position.y + stateNodeSize.height / 2,
   };
+};
+
+const screenToFlowPosition = (clientX: number, clientY: number): XYPosition => {
+  const pane = document.querySelector<HTMLElement>(".react-flow__pane");
+  const viewport = document.querySelector<HTMLElement>(".react-flow__viewport");
+  const paneRect = pane?.getBoundingClientRect();
+  const transform = viewport
+    ? new DOMMatrixReadOnly(getComputedStyle(viewport).transform)
+    : new DOMMatrixReadOnly();
+  const scaleX = transform.a || 1;
+  const scaleY = transform.d || 1;
+
+  return {
+    x: (clientX - (paneRect?.left ?? 0) - transform.m41) / scaleX,
+    y: (clientY - (paneRect?.top ?? 0) - transform.m42) / scaleY,
+  };
+};
+
+const createUniqueStateKey = (
+  graph: GraphModel,
+  parentPath: readonly string[],
+): string => {
+  const existingKeys = new Set(
+    graph.nodes
+      .filter((node) => pathEquals(node.parentPath ?? [], parentPath))
+      .map((node) => node.key),
+  );
+
+  let index = 1;
+  while (existingKeys.has(`newState${index}`)) {
+    index += 1;
+  }
+
+  return `newState${index}`;
+};
+
+const createUniqueEventKey = (
+  graph: GraphModel,
+  sourcePath: readonly string[],
+): string => {
+  const existingKeys = new Set(
+    graph.edges
+      .filter(
+        (edge) =>
+          edge.trigger.kind === "on" &&
+          edge.trigger.key &&
+          pathEquals(edge.sourcePath, sourcePath),
+      )
+      .map((edge) => edge.trigger.key),
+  );
+
+  let index = 1;
+  while (existingKeys.has(`EVENT_${index}`)) {
+    index += 1;
+  }
+
+  return `EVENT_${index}`;
+};
+
+const getConnectedStatePosition = (
+  sourcePosition: XYPosition,
+  direction: FlowDirection,
+): XYPosition => {
+  const horizontalGap = 260;
+  const verticalGap = 172;
+
+  if (direction === "top") {
+    return { x: sourcePosition.x, y: sourcePosition.y - verticalGap };
+  }
+
+  if (direction === "bottom") {
+    return { x: sourcePosition.x, y: sourcePosition.y + verticalGap };
+  }
+
+  if (direction === "left") {
+    return { x: sourcePosition.x - horizontalGap, y: sourcePosition.y };
+  }
+
+  return { x: sourcePosition.x + horizontalGap, y: sourcePosition.y };
+};
+
+const isEditableElement = (target: EventTarget | null): boolean => {
+  return (
+    target instanceof HTMLElement &&
+    Boolean(
+      target.closest("input, textarea, select, button, [contenteditable='true']"),
+    )
+  );
 };
 
 const getNodeRect = (position: XYPosition): FlowNodeRect => {
@@ -633,6 +767,8 @@ const toFlowNodes = (
   graph: GraphModel,
   selectedNodeId: string,
   positions: Readonly<Record<string, XYPosition>>,
+  canEdit: boolean,
+  onAddConnectedState: StateNodeData["onAddConnectedState"],
 ): Array<Node<StateNodeData>> => {
   const renderedStates = getRenderedGraphNodes(graph);
   const defaultPositions = getDefaultNodePositions(graph);
@@ -650,6 +786,8 @@ const toFlowNodes = (
       data: {
         node,
         active: node.id === selectedNodeId,
+        canEdit,
+        onAddConnectedState,
       },
     };
   });
@@ -790,7 +928,7 @@ const StateNode = ({
   data,
   selected,
 }: NodeProps<Node<StateNodeData, "stateNode">>) => {
-  const { node, active } = data;
+  const { node, active, canEdit, onAddConnectedState } = data;
   const metadata = [
     node.initial ? `initial: ${node.initial}` : "",
     node.entryActions.length > 0 ? `entry: ${node.entryActions.join(", ")}` : "",
@@ -816,6 +954,35 @@ const StateNode = ({
           className="state-node-handle state-node-handle-target"
         />
       ))}
+      {active && canEdit
+        ? handleSides.map((side) => (
+            <button
+              key={`add-${side.id}`}
+              type="button"
+              className={[
+                "state-node-add-control",
+                "nodrag",
+                "nopan",
+                `state-node-add-control-${side.id}`,
+              ].join(" ")}
+              data-editor-command="addConnectedState"
+              aria-label={`Add connected state ${side.id}`}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+              onMouseDown={(event) => {
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onAddConnectedState(node, side.id);
+              }}
+            >
+              +
+            </button>
+          ))
+        : null}
       <div className="state-node-title">
         <span className="state-node-icon" aria-hidden="true" />
         <strong>{node.key}</strong>
@@ -854,6 +1021,10 @@ const VisualEditorApp = () => {
   const initialPayload = useMemo(() => readInitialPayload(), []);
   const [panelPayload, setPanelPayload] = useState<PanelPayload>(initialPayload);
   const [draft, setDraft] = useState<DraftUpdatedPayload | undefined>();
+  const [pendingSourcePatch, setPendingSourcePatch] = useState<
+    SourcePatchPreviewPayload["patch"] | undefined
+  >();
+  const [sourcePatchStatus, setSourcePatchStatus] = useState("");
   const [uiMode, setUiMode] = useState<UiMode>("editor");
   const graph = draft?.graph ?? panelPayload.machine.graph;
   const diagnostics = draft?.diagnostics ?? panelPayload.diagnostics;
@@ -891,6 +1062,33 @@ const VisualEditorApp = () => {
     });
   };
 
+  const postDraftCommand = (
+    command: string,
+    params?: unknown,
+    options?: { readonly sourcePatch?: boolean },
+  ) => {
+    vscodeApi?.postMessage({
+      type: "DRAFT_COMMAND",
+      command,
+      ...(options?.sourcePatch === undefined
+        ? {}
+        : { sourcePatch: options.sourcePatch }),
+      params,
+    });
+  };
+
+  const applyPendingSourcePatch = () => {
+    if (!pendingSourcePatch) {
+      return;
+    }
+
+    setSourcePatchStatus("Applying source patch...");
+    vscodeApi?.postMessage({
+      type: "SOURCE_PATCH_APPLY",
+      patchId: pendingSourcePatch.id,
+    });
+  };
+
   const selectTransitionEdge = (edgeId: string) => {
     setSelectedEdgeId(edgeId);
     const modelEdge = graph.edges.find((edge) => edge.id === edgeId);
@@ -922,29 +1120,148 @@ const VisualEditorApp = () => {
   };
 
   const canEdit = panelPayload.mode === "visualEditor" && uiMode === "editor";
+
+  const addConnectedStateFromSide = (
+    sourceNode: GraphStateNode,
+    direction: FlowDirection,
+  ) => {
+    if (!canEdit || sourceNode.path.length === 0) {
+      return;
+    }
+
+    const parentPath = sourceNode.parentPath ?? sourceNode.path.slice(0, -1);
+    const key = createUniqueStateKey(graph, parentPath);
+    const eventKey = createUniqueEventKey(graph, sourceNode.path);
+    const targetPath = [...parentPath, key];
+    const targetId = getNodeId(graph.id, targetPath);
+    const defaultPositions = getDefaultNodePositions(graph);
+    const sourcePosition =
+      nodePositions[sourceNode.id] ?? defaultPositions[sourceNode.id] ?? { x: 0, y: 0 };
+    const targetPosition = getConnectedStatePosition(sourcePosition, direction);
+    const edgeId = getTransitionEdgeId(graph.id, sourceNode.path, "on", eventKey);
+    const edgeLabel = getEdgeLabel({
+      id: edgeId,
+      sourcePath: sourceNode.path,
+      target: key,
+      targetPath,
+      trigger: { kind: "on", key: eventKey },
+      actions: [],
+    });
+    const labelSize = getTransitionLabelSize(edgeLabel);
+    const sourceCenter = getNodeCenter(sourcePosition);
+    const targetCenter = getNodeCenter(targetPosition);
+    const labelPosition = {
+      x: (sourceCenter.x + targetCenter.x) / 2 - labelSize.width / 2,
+      y: (sourceCenter.y + targetCenter.y) / 2 - labelSize.height / 2,
+    };
+    const nextNodePositions = {
+      ...nodePositions,
+      [targetId]: targetPosition,
+    };
+    const nextLabelPositions = {
+      ...labelPositions,
+      [edgeId]: labelPosition,
+    };
+
+    setSelectedNodeId(targetId);
+    setSelectedEdgeId(edgeId);
+    setNodePositions(nextNodePositions);
+    setLabelPositions(nextLabelPositions);
+    postLayoutUpdated(nextNodePositions, nextLabelPositions);
+    postDraftCommand(
+      "addConnectedState",
+      {
+        sourcePath: sourceNode.path,
+        parentPath,
+        key,
+        trigger: {
+          kind: "on",
+          key: eventKey,
+        },
+        transition: {
+          target: key,
+        },
+      },
+      { sourcePatch: false },
+    );
+  };
+
+  const addStateAtPosition = (position: XYPosition) => {
+    if (!canEdit) {
+      return;
+    }
+
+    const parentPath: readonly string[] = [];
+    const key = createUniqueStateKey(graph, parentPath);
+    const targetId = getNodeId(graph.id, [key]);
+    const nextNodePositions = {
+      ...nodePositions,
+      [targetId]: position,
+    };
+
+    setSelectedNodeId(targetId);
+    setSelectedEdgeId("");
+    setNodePositions(nextNodePositions);
+    postLayoutUpdated(nextNodePositions, labelPositions);
+    postDraftCommand("addState", {
+      parentPath,
+      key,
+    });
+  };
+
+  const handleDeleteSelection = () => {
+    if (!canEdit) {
+      return;
+    }
+
+    if (selectedEdgeId) {
+      postDraftCommand(
+        "removeTransition",
+        { edgeId: selectedEdgeId },
+        { sourcePatch: false },
+      );
+      setSelectedEdgeId("");
+      return;
+    }
+
+    const node = graph.nodes.find((candidate) => candidate.id === selectedNodeId);
+    if (!node || node.path.length === 0) {
+      return;
+    }
+
+    postDraftCommand("removeState", { path: node.path }, { sourcePatch: false });
+    setSelectedNodeId(
+      graph.nodes.find(
+        (candidate) => candidate.id !== node.id && candidate.path.length > 0,
+      )?.id ??
+        graph.nodes[0]?.id ??
+        "",
+    );
+  };
+
   const defaultLabelPositions = useMemo(
     () => getDefaultTransitionLabelPositions(graph, nodePositions),
     [graph, nodePositions],
   );
 
   useEffect(() => {
+    const listener = (event: KeyboardEvent) => {
+      if (
+        (event.key === "Backspace" || event.key === "Delete") &&
+        !isEditableElement(event.target)
+      ) {
+        event.preventDefault();
+        handleDeleteSelection();
+      }
+    };
+
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, [handleDeleteSelection]);
+
+  useEffect(() => {
     const getLabelPosition = (edgeId: string): XYPosition | undefined => {
       return labelPositions[edgeId] ?? defaultLabelPositions[edgeId];
-    };
-    const screenToFlowPosition = (clientX: number, clientY: number): XYPosition => {
-      const pane = document.querySelector<HTMLElement>(".react-flow__pane");
-      const viewport = document.querySelector<HTMLElement>(".react-flow__viewport");
-      const paneRect = pane?.getBoundingClientRect();
-      const transform = viewport
-        ? new DOMMatrixReadOnly(getComputedStyle(viewport).transform)
-        : new DOMMatrixReadOnly();
-      const scaleX = transform.a || 1;
-      const scaleY = transform.d || 1;
-
-      return {
-        x: (clientX - (paneRect?.left ?? 0) - transform.m41) / scaleX,
-        y: (clientY - (paneRect?.top ?? 0) - transform.m42) / scaleY,
-      };
     };
 
     const handleMouseDown = (event: MouseEvent) => {
@@ -1024,8 +1341,12 @@ const VisualEditorApp = () => {
         graph,
         selectedNode?.id ?? selectedNodeId,
         nodePositions,
+        canEdit,
+        addConnectedStateFromSide,
       ),
     [
+      addConnectedStateFromSide,
+      canEdit,
       graph,
       nodePositions,
       selectedNode?.id,
@@ -1050,7 +1371,15 @@ const VisualEditorApp = () => {
   );
 
   useEffect(() => {
-    const listener = (event: MessageEvent<PanelPayload | DraftUpdatedPayload>) => {
+    const listener = (
+      event: MessageEvent<
+        | PanelPayload
+        | DraftUpdatedPayload
+        | SourcePatchPreviewPayload
+        | SourcePatchAppliedPayload
+        | SourcePatchStatusPayload
+      >,
+    ) => {
       const message = event.data;
       if (!message || typeof message !== "object") {
         return;
@@ -1058,6 +1387,34 @@ const VisualEditorApp = () => {
 
       if ("type" in message && message.type === "DRAFT_UPDATED") {
         setDraft(message);
+        return;
+      }
+
+      if ("type" in message && message.type === "SOURCE_PATCH_PREVIEW") {
+        setPendingSourcePatch(message.patch);
+        setSourcePatchStatus("");
+        return;
+      }
+
+      if ("type" in message && message.type === "SOURCE_PATCH_APPLIED") {
+        setPendingSourcePatch(undefined);
+        setSourcePatchStatus("Source patch applied.");
+        setDraft(undefined);
+        setPanelPayload((current) => ({
+          ...current,
+          machine: message.machine,
+          diagnostics: message.diagnostics ?? current.diagnostics,
+        }));
+        return;
+      }
+
+      if (
+        "type" in message &&
+        (message.type === "SOURCE_PATCH_UNAVAILABLE" ||
+          message.type === "SOURCE_PATCH_ERROR")
+      ) {
+        setPendingSourcePatch(undefined);
+        setSourcePatchStatus(message.message);
         return;
       }
 
@@ -1099,14 +1456,6 @@ const VisualEditorApp = () => {
   useEffect(() => {
     setTransitionForm(createInitialTransitionForm(selectedEdge));
   }, [selectedEdge?.id]);
-
-  const postDraftCommand = (command: string, params?: unknown) => {
-    vscodeApi?.postMessage({
-      type: "DRAFT_COMMAND",
-      command,
-      params,
-    });
-  };
 
   const updateStateForm = (patch: Partial<StateFormValue>) => {
     setStateForm((current) => ({ ...current, ...patch }));
@@ -1212,6 +1561,14 @@ const VisualEditorApp = () => {
               setNodePositions(nextPositions);
               postLayoutUpdated(nextPositions, labelPositions);
             }}
+            onPaneClick={(event) => {
+              if (event.detail !== 2) {
+                return;
+              }
+
+              event.preventDefault();
+              addStateAtPosition(screenToFlowPosition(event.clientX, event.clientY));
+            }}
             panOnDrag={true}
             selectionOnDrag={false}
             proOptions={{ hideAttribution: true }}
@@ -1250,6 +1607,35 @@ const VisualEditorApp = () => {
             {draft?.isDirty ? <span className="status-pill">Draft</span> : null}
             {hasDiagnostics ? <span className="status-pill warning">Issues</span> : null}
           </div>
+
+          {pendingSourcePatch ? (
+            <section
+              className="source-patch-card"
+              data-testid="source-patch-preview"
+            >
+              <div className="pane-header">
+                <h2>Source patch</h2>
+                <span className="status-pill">Pending</span>
+              </div>
+              <strong>{pendingSourcePatch.title}</strong>
+              <details>
+                <summary>Preview</summary>
+                <pre>{pendingSourcePatch.previewText}</pre>
+              </details>
+              <button
+                type="button"
+                data-editor-command="applySourcePatch"
+                disabled={!canEdit}
+                onClick={applyPendingSourcePatch}
+              >
+                Apply source edit
+              </button>
+            </section>
+          ) : null}
+
+          {sourcePatchStatus ? (
+            <div className="source-patch-status">{sourcePatchStatus}</div>
+          ) : null}
 
           <form
             className="editor-form"

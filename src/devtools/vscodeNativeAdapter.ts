@@ -4,6 +4,10 @@ import {
   type SourceTextEdit,
 } from "./sourceReader";
 import {
+  createVisualEditorSourcePatchPreview,
+  type SourcePatchPreviewSuccess,
+} from "./sourcePatch";
+import {
   createMobxstateLayoutTextEdit,
   type MobxstateLayoutPosition,
 } from "./layoutMetadata";
@@ -177,6 +181,11 @@ interface VisualEditorLayoutUpdatedMessage {
   readonly labelPositions?: Readonly<Record<string, MobxstateLayoutPosition>>;
 }
 
+interface VisualEditorSourcePatchApplyMessage {
+  readonly type: "SOURCE_PATCH_APPLY";
+  readonly patchId: string;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 };
@@ -213,6 +222,16 @@ const isLayoutUpdatedMessage = (
   }
 
   return readLayoutPositions(message.positions) !== undefined;
+};
+
+const isSourcePatchApplyMessage = (
+  message: unknown,
+): message is VisualEditorSourcePatchApplyMessage => {
+  return (
+    isRecord(message) &&
+    message.type === "SOURCE_PATCH_APPLY" &&
+    typeof message.patchId === "string"
+  );
 };
 
 const mapSeverity = (
@@ -417,7 +436,114 @@ export const createVscodeDevtoolsExtension = (
       await panel.webview.postMessage(payload);
 
       if (payload.mode === "visualEditor" && panel.webview.onDidReceiveMessage) {
-        const session = createVisualEditorSession(payload.machine.config);
+        let currentPayload = payload;
+        let currentSourceText: string | undefined;
+        let session = createVisualEditorSession(currentPayload.machine.config);
+        const pendingSourcePatches = new Map<string, SourcePatchPreviewSuccess>();
+
+        const getCurrentSourceText = async (): Promise<string> => {
+          if (currentSourceText !== undefined) {
+            return currentSourceText;
+          }
+
+          const nativeUri = parseUri(currentPayload.uri);
+          const document = rememberDocument(
+            await api.workspace.openTextDocument(nativeUri),
+          );
+          currentSourceText = document.getText();
+          return currentSourceText;
+        };
+
+        const postSourcePatchPreview = async (
+          message: VisualEditorDraftCommandMessage,
+        ): Promise<void> => {
+          const sourceText = await getCurrentSourceText();
+          const preview = createVisualEditorSourcePatchPreview(
+            sourceText,
+            currentPayload.machine,
+            message,
+          );
+
+          if (!preview.ok) {
+            await panel.webview.postMessage({
+              type: "SOURCE_PATCH_UNAVAILABLE",
+              code: preview.code,
+              message: preview.message,
+            });
+            return;
+          }
+
+          pendingSourcePatches.set(preview.id, preview);
+          await panel.webview.postMessage({
+            type: "SOURCE_PATCH_PREVIEW",
+            patch: preview,
+          });
+        };
+
+        const applySourcePatch = async (
+          message: VisualEditorSourcePatchApplyMessage,
+        ): Promise<void> => {
+          const patch = pendingSourcePatches.get(message.patchId);
+          if (!patch) {
+            await panel.webview.postMessage({
+              type: "SOURCE_PATCH_ERROR",
+              patchId: message.patchId,
+              message: "Source patch preview is no longer available.",
+            });
+            return;
+          }
+
+          const result = await shell.applyAcceptedTextEdits(
+            currentPayload.uri,
+            currentPayload.documentVersion + 1,
+            patch.edits,
+          );
+
+          if ("kind" in result && !("snapshot" in result)) {
+            await panel.webview.postMessage({
+              type: "SOURCE_PATCH_ERROR",
+              patchId: patch.id,
+              message: result.error ?? "MobXstate source patch failed.",
+            });
+            return;
+          }
+
+          const machine =
+            result.displayedMachine ??
+            result.snapshot.machines.find(
+              (candidate) =>
+                candidate.machineIndex === currentPayload.machine.machineIndex,
+            ) ??
+            result.snapshot.machines[0];
+
+          if (!machine) {
+            await panel.webview.postMessage({
+              type: "SOURCE_PATCH_ERROR",
+              patchId: patch.id,
+              message: "Source patch applied, but no machine was found after re-read.",
+            });
+            return;
+          }
+
+          currentSourceText = result.snapshot.text;
+          currentPayload = {
+            ...currentPayload,
+            documentVersion: result.snapshot.version,
+            machine,
+          };
+          session = createVisualEditorSession(machine.config);
+          pendingSourcePatches.clear();
+
+          await panel.webview.postMessage({
+            type: "SOURCE_PATCH_APPLIED",
+            patchId: patch.id,
+            machine,
+            diagnostics: result.diagnostics,
+          });
+          await panel.webview.postMessage(currentPayload);
+          await panel.webview.postMessage(session.getSnapshot());
+        };
+
         const disposable = panel.webview.onDidReceiveMessage(async (message) => {
           if (isLayoutUpdatedMessage(message)) {
             const nativeUri = parseUri(payload.uri);
@@ -449,9 +575,18 @@ export const createVscodeDevtoolsExtension = (
             return;
           }
 
-          await panel.webview.postMessage(
-            session.handleMessage(message as VisualEditorDraftCommandMessage),
-          );
+          if (isSourcePatchApplyMessage(message)) {
+            await applySourcePatch(message);
+            return;
+          }
+
+          const draftMessage = message as VisualEditorDraftCommandMessage;
+          const snapshot = session.handleMessage(draftMessage);
+          await panel.webview.postMessage(snapshot);
+
+          if (snapshot.commandResult?.ok && draftMessage.sourcePatch !== false) {
+            await postSourcePatchPreview(draftMessage);
+          }
         });
         context?.subscriptions.push(disposable);
         await panel.webview.postMessage(session.getSnapshot());

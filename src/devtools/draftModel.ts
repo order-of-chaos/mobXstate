@@ -20,6 +20,7 @@ import {
 
 export type DraftCommandType =
   | "add_state"
+  | "add_connected_state"
   | "rename_state"
   | "remove_state"
   | "set_state_type"
@@ -68,6 +69,14 @@ export interface DraftModel<
   addState(
     parentPath: readonly string[],
     key: string,
+    stateConfig?: MachineStateNodeConfig<Event>,
+  ): DraftCommandResult;
+  addConnectedState(
+    sourcePath: readonly string[],
+    parentPath: readonly string[],
+    key: string,
+    trigger: DraftTransitionTrigger,
+    transition: MachineTransitionConfig<Event>,
     stateConfig?: MachineStateNodeConfig<Event>,
   ): DraftCommandResult;
   renameState(path: readonly string[], newKey: string): DraftCommandResult;
@@ -576,6 +585,50 @@ class MachineDraftModel<
       }
 
       states[key] = cloneValue(stateConfig);
+      return undefined;
+    });
+  };
+
+  public addConnectedState = (
+    sourcePath: readonly string[],
+    parentPath: readonly string[],
+    key: string,
+    trigger: DraftTransitionTrigger,
+    transition: MachineTransitionConfig<Event>,
+    stateConfig: MachineStateNodeConfig<Event> = {},
+  ): DraftCommandResult => {
+    return this.applyCommand("add_connected_state", (config) => {
+      if (!isValidStateKey(key)) {
+        return `Invalid state key "${key}".`;
+      }
+
+      const parent = getStateConfig(config, parentPath);
+      if (!parent) {
+        return `State "${pathKey(parentPath)}" was not found.`;
+      }
+
+      if (!getStateConfig(config, sourcePath)) {
+        return `State "${pathKey(sourcePath)}" was not found.`;
+      }
+
+      const states = getStateMap(parent);
+      if (states[key]) {
+        return `State "${key}" already exists in "${pathKey(parentPath) || config.id}".`;
+      }
+
+      const slot = getTransitionSlot(config, sourcePath, trigger);
+      if (!slot) {
+        return `Transition slot was not found for state "${pathKey(sourcePath)}".`;
+      }
+
+      states[key] = cloneValue(stateConfig);
+      const transitions = normalizeTransition(slot.get());
+      transitions.push(cloneValue(transition));
+      const nextValue = compactTransitionValue(transitions);
+      if (nextValue) {
+        slot.set(nextValue);
+      }
+
       return undefined;
     });
   };

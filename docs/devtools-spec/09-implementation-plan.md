@@ -143,14 +143,20 @@ Definition of Done:
 - Graph-first visual editor UI: React Flow webview bundle, host-side
   `DraftModel` session, `DRAFT_COMMAND`/`DRAFT_UPDATED` webview protocol,
   `Editor`/`Simulation` modes, draggable local node positions,
-  state/transition inspector forms и undo/redo.
+  state/transition inspector forms, Stately-style side `+` controls,
+  double-click canvas state creation, keyboard delete и undo/redo.
 - Visual editor layout persistence: side-aware handles, custom edge labels and
   compressed `@mobxstate` layout metadata comments applied through VS Code
   `WorkspaceEdit`, then restored from source when the editor is reopened.
+- Source patch preview first slice: shared source patch planner for safe
+  `addState` commands, VS Code webview `SOURCE_PATCH_PREVIEW` /
+  `SOURCE_PATCH_APPLY` flow, native `WorkspaceEdit` application and worker
+  re-read after accepted source edits.
 
 Порядок:
 
-1. Source patch preview для accepted editor changes.
+1. Расширить source patch coverage для остальных accepted editor changes:
+   rename/remove state, transition add/update/remove, entry/exit/invoke.
 2. WebStorm plugin shell.
 3. Zed diagnostics/typegen.
 4. Zed visual UI только после стабильной API-возможности.

@@ -88,6 +88,41 @@ describe("devtools draft model", () => {
     expect(draft.exportConfig().states?.working).toBeDefined();
   });
 
+  it("adds a connected state and transition as one undoable command", () => {
+    const draft = createDraftModel<DraftEvent>({
+      id: "connected",
+      initial: "idle",
+      states: {
+        idle: {},
+      },
+    });
+
+    expect(
+      draft.addConnectedState(
+        ["idle"],
+        [],
+        "ready",
+        { kind: "on", key: "DONE" },
+        { target: "ready" },
+      ),
+    ).toMatchObject({ ok: true, command: "add_connected_state" });
+
+    expect(draft.exportConfig().states?.ready).toEqual({});
+    expect(draft.exportConfig().states?.idle?.on?.DONE).toEqual({
+      target: "ready",
+    });
+    expect(
+      draft.getGraph().edges.find((edge) => edge.trigger.key === "DONE"),
+    ).toMatchObject({
+      sourcePath: ["idle"],
+      targetPath: ["ready"],
+    });
+
+    expect(draft.undo()).toMatchObject({ ok: true });
+    expect(draft.exportConfig().states?.ready).toBeUndefined();
+    expect(draft.exportConfig().states?.idle?.on).toBeUndefined();
+  });
+
   it("removes states and keeps validation diagnostics visible", () => {
     const draft = createDraftModel<DraftEvent>({
       id: "remove",

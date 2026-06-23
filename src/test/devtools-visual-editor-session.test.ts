@@ -71,6 +71,37 @@ describe("visual editor session", () => {
     expect(addTransition.exportText).toContain("DONE");
   });
 
+  it("handles connected state creation as one webview command", () => {
+    const session = createVisualEditorSession(config);
+
+    const snapshot = session.handleMessage({
+      type: "DRAFT_COMMAND",
+      command: "addConnectedState",
+      params: {
+        sourcePath: ["idle"],
+        parentPath: [],
+        key: "ready",
+        trigger: {
+          kind: "on",
+          key: "DONE",
+        },
+        transition: {
+          target: "ready",
+        },
+      },
+    } as unknown as VisualEditorDraftCommandMessage);
+
+    expect(snapshot.commandResult).toMatchObject({
+      ok: true,
+      command: "add_connected_state",
+    });
+    expect(snapshot.graph.nodes.map((node) => node.id)).toContain("editor.ready");
+    expect(snapshot.graph.edges.find((edge) => edge.trigger.key === "DONE")).toMatchObject({
+      sourcePath: ["idle"],
+      targetPath: ["ready"],
+    });
+  });
+
   it("supports rename, remove, undo and redo commands", () => {
     const session = createVisualEditorSession(config);
 

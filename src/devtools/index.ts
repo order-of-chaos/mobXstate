@@ -45,6 +45,10 @@ export {
   formatVisualEditorExport,
 } from "./visualEditorSession";
 export {
+  applySourceTextEdits,
+  createVisualEditorSourcePatchPreview,
+} from "./sourcePatch";
+export {
   createMobxstateLayoutTextEdit,
   decodeMobxstateLayoutComment,
   encodeMobxstateLayoutComment,
@@ -165,6 +169,12 @@ export type {
   VisualEditorDraftSnapshot,
   VisualEditorSession,
 } from "./visualEditorSession";
+export type {
+  SourcePatchPreview,
+  SourcePatchPreviewFailure,
+  SourcePatchPreviewFailureCode,
+  SourcePatchPreviewSuccess,
+} from "./sourcePatch";
 export type {
   MobxstateLayoutMetadata,
   MobxstateLayoutMetadataInput,

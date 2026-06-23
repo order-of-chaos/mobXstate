@@ -187,6 +187,51 @@ button:disabled {
   background: var(--panel-raised);
 }
 
+.source-patch-card {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-raised);
+}
+
+.source-patch-card strong {
+  display: block;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+.source-patch-card details {
+  margin-bottom: 8px;
+}
+
+.source-patch-card summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.source-patch-card pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--input);
+  font: 11px/1.45 var(--vscode-editor-font-family, monospace);
+  white-space: pre;
+}
+
+.source-patch-status {
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--panel-raised);
+}
+
 .pane-header {
   min-height: 24px;
   display: flex;
@@ -342,6 +387,7 @@ button:disabled {
 }
 
 .state-node {
+  position: relative;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -350,6 +396,54 @@ button:disabled {
   border-radius: 7px;
   background: #20242b;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.state-node-add-control {
+  position: absolute;
+  z-index: 8;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, #ffffff);
+  border-radius: 4px;
+  color: var(--accent);
+  background: var(--vscode-button-secondaryBackground, #ffffff);
+  font-size: 19px;
+  line-height: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.state-node-add-control:hover,
+.state-node-add-control:focus-visible {
+  color: var(--button-text);
+  background: var(--button);
+}
+
+.state-node-add-control-top {
+  top: -33px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.state-node-add-control-right {
+  top: 50%;
+  right: -34px;
+  transform: translateY(-50%);
+}
+
+.state-node-add-control-bottom {
+  bottom: -33px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.state-node-add-control-left {
+  top: 50%;
+  left: -34px;
+  transform: translateY(-50%);
 }
 
 .state-node-active {

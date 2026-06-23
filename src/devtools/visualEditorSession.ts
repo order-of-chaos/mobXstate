@@ -12,6 +12,7 @@ import type { DevtoolsDiagnostic, GraphModel } from "./machineAnalyzer";
 
 export type VisualEditorDraftCommandName =
   | "addState"
+  | "addConnectedState"
   | "renameState"
   | "removeState"
   | "setStateType"
@@ -25,6 +26,7 @@ export type VisualEditorDraftCommandName =
 export interface VisualEditorDraftCommandMessage {
   readonly type: "DRAFT_COMMAND";
   readonly requestId?: string;
+  readonly sourcePatch?: boolean;
   readonly command: VisualEditorDraftCommandName;
   readonly params?: unknown;
 }
@@ -269,6 +271,7 @@ class DraftVisualEditorSession<
 
     if (
       command !== "addState" &&
+      command !== "addConnectedState" &&
       command !== "renameState" &&
       command !== "removeState" &&
       command !== "setStateType" &&
@@ -286,6 +289,17 @@ class DraftVisualEditorSession<
       return this.draft.addState(
         assertPath(record, "parentPath"),
         assertString(record, "key"),
+        readStateConfig(record.stateConfig),
+      );
+    }
+
+    if (command === "addConnectedState") {
+      return this.draft.addConnectedState(
+        assertPath(record, "sourcePath"),
+        assertPath(record, "parentPath"),
+        assertString(record, "key"),
+        readTrigger(record.trigger),
+        readTransitionPatch<Event>(record.transition),
         readStateConfig(record.stateConfig),
       );
     }

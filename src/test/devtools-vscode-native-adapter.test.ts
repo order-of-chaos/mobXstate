@@ -460,6 +460,78 @@ describe("VS Code native devtools adapter", () => {
     );
   });
 
+  it("previews and applies visual editor source patches through WorkspaceEdit", async () => {
+    const harness = createFakeVscode();
+    createVscodeDevtoolsExtension(harness.api, harness.context);
+
+    await harness.commands.get(vscodeDevtoolsCommandIds.openVisualEditor)?.();
+    const [panel] = harness.panels;
+    expect(panel).toBeDefined();
+
+    await panel?.receive({
+      type: "DRAFT_COMMAND",
+      command: "addState",
+      params: {
+        parentPath: [],
+        key: "readyFromPatch",
+      },
+    });
+
+    const preview = panel?.messages.find((message) => {
+      return (
+        typeof message === "object" &&
+        message !== null &&
+        "type" in message &&
+        message.type === "SOURCE_PATCH_PREVIEW"
+      );
+    }) as
+      | {
+          readonly type: "SOURCE_PATCH_PREVIEW";
+          readonly patch: {
+            readonly id: string;
+            readonly title: string;
+            readonly edits: readonly SourceTextEdit[];
+            readonly previewText: string;
+          };
+        }
+      | undefined;
+
+    expect(preview?.patch.title).toBe('Add state "readyFromPatch"');
+    expect(preview?.patch.previewText).toContain("readyFromPatch: {}");
+
+    await panel?.receive({
+      type: "SOURCE_PATCH_APPLY",
+      patchId: preview?.patch.id,
+    });
+
+    expect(harness.appliedEdits).toHaveLength(1);
+    expect(harness.appliedEdits[0]?.replacements[0]?.text).toContain(
+      "readyFromPatch: {}",
+    );
+
+    const applied = panel?.messages.find((message) => {
+      return (
+        typeof message === "object" &&
+        message !== null &&
+        "type" in message &&
+        message.type === "SOURCE_PATCH_APPLIED"
+      );
+    }) as
+      | {
+          readonly type: "SOURCE_PATCH_APPLIED";
+          readonly machine: {
+            readonly graph: {
+              readonly nodes: readonly { readonly id: string }[];
+            };
+          };
+      }
+      | undefined;
+
+    expect(applied?.machine.graph.nodes.map((node) => node.id)).toContain(
+      "nativeAdapter.readyFromPatch",
+    );
+  });
+
   it("persists visual editor node positions as layout metadata", async () => {
     const harness = createFakeVscode();
     createVscodeDevtoolsExtension(harness.api, harness.context);

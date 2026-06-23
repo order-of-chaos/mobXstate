@@ -9,6 +9,45 @@ MobXstate и получать валидный config, который испол
 Первый editor не обязан менять исходный `.ts` файл. Он обязан надежно менять
 draft model и экспортировать новый config.
 
+## Visual canvas
+
+Основной экран editor - graph canvas состояний и переходов. Правая панель не
+дублирует список states/transitions/export/diagnostics: вся логика должна быть
+видна на графе. Панель справа содержит только формы команд для выбранного
+state/transition и краткий статус draft/issues.
+
+VS Code implementation использует React Flow (`@xyflow/react`) внутри webview.
+Это дает готовые pan/zoom/fitView/selection/edges и не заставляет MobXstate
+поддерживать собственный canvas engine. MobXstate-specific слой должен
+оставаться небольшим adapter:
+
+- `GraphModel.nodes` -> React Flow state nodes;
+- `GraphModel.edges` -> React Flow transition edges;
+- node/edge selection -> inspector state;
+- editor forms -> `DRAFT_COMMAND`;
+- host response -> `DRAFT_UPDATED`.
+- node drag -> React Flow positions в webview state и source layout metadata.
+
+Edges используют side-aware source/target handles для React Flow semantics, но
+визуальная линия маршрутизируется от границы source node к границе target node.
+Draggable label overlays являются waypoint-точками самого перехода: если
+пользователь двигает плашку action/guard, rounded orthogonal route
+перестраивается через новую позицию плашки. Пользователь может двигать state
+nodes и собирать понятную карту логики вручную.
+
+Позиции canvas сохраняются отдельно от semantic config в opaque-комментарии
+внутри `createMachine({...})`:
+
+```ts
+/** @mobxstate N4IgpgJg5mDOIC5QCMCuBLANhAQh76AdlACJgC2A9purABYBimlAblablabla **/
+```
+
+Этот комментарий содержит только layout metadata. Он не должен менять
+`MachineConfig`, `DraftModel` или runtime behavior.
+
+React и graph dependency не должны попадать в runtime package boundary:
+они живут только в VS Code webview bundle.
+
 ## Главный принцип
 
 Editor редактирует не store, а machine config.
@@ -28,6 +67,12 @@ Editor может подсказать, что store member отсутствуе
 автоматически писать бизнес-логику store.
 
 ## Режимы editor
+
+UI режимы:
+
+- `Editor` - редактирование draft, undo/redo и drag нод по холсту;
+- `Simulation` - тот же graph canvas, но без draft edits и node drag; runtime
+  controls добавляются отдельным шагом поверх simulator controller.
 
 ### Режим draft
 

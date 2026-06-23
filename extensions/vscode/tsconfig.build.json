@@ -1,12 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": false,
+    "noEmit": true,
     "declaration": false,
     "emitDeclarationOnly": false,
-    "outDir": "dist",
-    "rootDir": "src",
-    "sourceMap": true,
     "paths": {
       "@orderofchaos/mobxstate": ["../../dist/index.d.ts"]
     }

@@ -6,18 +6,26 @@
   "private": true,
   "publisher": "orderofchaos",
   "scripts": {
-    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json"
+    "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('media',{recursive:true,force:true})\"",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json && node scripts/build-extension.mjs && node scripts/build-webview.mjs",
+    "build:extension": "node scripts/build-extension.mjs",
+    "build:webview": "node scripts/build-webview.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json"
   },
   "engines": {
     "vscode": "^1.90.0"
   },
-  "dependencies": {
-    "@orderofchaos/mobxstate": "file:../.."
-  },
-  "files": ["dist", "README.md", "package.json"],
-  "categories": ["Visualization", "Other"],
+  "files": [
+    "dist",
+    "media",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
   "activationEvents": [
     "onCommand:mobxstate.openViewer",
     "onCommand:mobxstate.openVisualEditor",
@@ -49,5 +57,14 @@
         "title": "MobXstate: Export Machine Config"
       }
     ]
+  },
+  "devDependencies": {
+    "@orderofchaos/mobxstate": "file:../..",
+    "@xyflow/react": "^12.11.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.28.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

@@ -1,0 +1,442 @@
+:root {
+  color-scheme: dark light;
+  --canvas: #111418;
+  --panel: var(--vscode-editor-background, #1f1f24);
+  --panel-raised: var(--vscode-sideBar-background, #25262d);
+  --line: var(--vscode-panel-border, #3a3d45);
+  --text: var(--vscode-foreground, #e5e7eb);
+  --muted: var(--vscode-descriptionForeground, #9da3af);
+  --accent: var(--vscode-focusBorder, #4da3ff);
+  --button: var(--vscode-button-background, #0e639c);
+  --button-text: var(--vscode-button-foreground, #ffffff);
+  --input: var(--vscode-input-background, #171a1f);
+  --grid-line: rgba(148, 163, 184, 0.13);
+  --minimap-node: #5f6470;
+  --minimap-mask: rgba(17, 20, 24, 0.72);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#mobxstate-webview-root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: var(--panel);
+}
+
+button,
+input,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--button-text);
+  background: var(--button);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.shell {
+  height: 100vh;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--panel);
+}
+
+.topbar {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-raised);
+}
+
+.machine-title {
+  min-width: 0;
+}
+
+.machine-title h1 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 19px;
+}
+
+.machine-title span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+}
+
+.mode-tabs {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mode-tabs button {
+  min-width: 72px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: var(--text);
+  background: transparent;
+}
+
+.mode-tabs button:first-child {
+  border-left: 0;
+}
+
+.mode-tabs button[aria-selected="true"] {
+  color: var(--button-text);
+  background: var(--button);
+}
+
+.graph-workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) minmax(286px, 340px);
+  background: var(--line);
+  gap: 1px;
+}
+
+.graph-pane {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.graph-topbar {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  min-height: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.graph-topbar > div {
+  min-width: 0;
+}
+
+.graph-topbar strong,
+.graph-topbar span {
+  display: block;
+}
+
+.graph-topbar span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.editor-toolbar button {
+  color: var(--text);
+  background: var(--panel-raised);
+}
+
+.inspector-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  background: var(--panel);
+}
+
+.editor-form {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-raised);
+}
+
+.pane-header {
+  min-height: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pane-header h2,
+.editor-form h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.status-pill {
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.status-pill.warning {
+  border-color: var(--vscode-inputValidation-warningBorder, #cca700);
+  color: var(--vscode-inputValidation-warningForeground, #cca700);
+}
+
+.panel-status {
+  min-height: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.editor-form {
+  display: grid;
+  gap: 8px;
+}
+
+.editor-form label {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.editor-form input,
+.editor-form select {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--input);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.form-actions button {
+  padding: 0 8px;
+}
+
+.diagnostic-error {
+  border-color: var(--vscode-inputValidation-errorBorder, #f14c4c);
+}
+
+.diagnostic-error {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid;
+  border-radius: 5px;
+  color: var(--vscode-inputValidation-errorForeground, #f14c4c);
+}
+
+.react-flow {
+  color: var(--text);
+}
+
+.react-flow__edge-path {
+  stroke: #a4a9b5;
+  stroke-width: 1.7;
+}
+
+.transition-edge-path {
+  stroke: #a4a9b5;
+  stroke-width: 1.7;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path,
+.transition-edge-path-selected {
+  stroke: var(--accent);
+  stroke-width: 2.2;
+}
+
+.transition-edge-label {
+  position: absolute;
+  min-width: 72px;
+  max-width: 204px;
+  height: 26px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, #ffffff);
+  border-radius: 4px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--canvas) 86%, #000000);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+  cursor: grab;
+  pointer-events: all;
+  user-select: none;
+}
+
+.transition-edge-label:active {
+  cursor: grabbing;
+}
+
+.transition-edge-label-active {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.24);
+}
+
+.react-flow__controls {
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  border-color: var(--line);
+  background: var(--panel-raised);
+  fill: var(--text);
+}
+
+.state-node {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 1px solid #7b8190;
+  border-radius: 7px;
+  background: #20242b;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.state-node-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.state-node-final {
+  border-color: #8dd89a;
+}
+
+.state-node-parallel {
+  border-color: #d5b35b;
+}
+
+.state-node-history {
+  border-style: dashed;
+}
+
+.state-node-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.state-node-title strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.state-node-icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border: 2px solid #aeb4c1;
+  border-radius: 2px;
+}
+
+.state-node-type {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.state-node-meta {
+  margin-top: 6px;
+  display: grid;
+  gap: 3px;
+  color: #c3cad7;
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.state-node-meta span {
+  overflow-wrap: anywhere;
+}
+
+.state-node-handle {
+  width: 9px;
+  height: 9px;
+  border: 1px solid #d8dee9;
+  background: #d8dee9;
+  opacity: 0.88;
+}
+
+.state-node-handle-target {
+  background: var(--canvas);
+}
+
+.state-node-handle-source {
+  background: #d8dee9;
+}
+
+.state-node:hover .state-node-handle,
+.state-node-active .state-node-handle {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+@media (max-width: 920px) {
+  .graph-workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(420px, 1fr) auto;
+  }
+
+  .inspector-pane {
+    max-height: 48vh;
+  }
+}

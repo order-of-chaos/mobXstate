@@ -1,4 +1,12 @@
-import type { SourceRange, SourceTextEdit } from "./sourceReader";
+import {
+  findCreateMachineCalls,
+  type SourceRange,
+  type SourceTextEdit,
+} from "./sourceReader";
+import {
+  createMobxstateLayoutTextEdit,
+  type MobxstateLayoutPosition,
+} from "./layoutMetadata";
 import {
   createVisualEditorSession,
   type VisualEditorDraftCommandMessage,
@@ -9,9 +17,11 @@ import {
   type VscodeDevtoolsDisposable,
   type VscodeDevtoolsHost,
   type VscodeDevtoolsShell,
+  vscodeDevtoolsCommandIds,
 } from "./vscodeExtensionShell";
 import {
   createVscodeDevtoolsWebviewHtml,
+  type VscodeDevtoolsWebviewAssetOptions,
   getVscodeDevtoolsPanelTitle,
   getVscodeDevtoolsPanelViewType,
 } from "./vscodeWebviewUi";
@@ -27,6 +37,22 @@ export type VscodeNativeRange = unknown;
 export interface VscodeNativeDiagnostic {
   source?: string;
   code?: string;
+}
+
+export interface VscodeNativeCommand {
+  readonly title: string;
+  readonly command: string;
+}
+
+export interface VscodeNativeCodeLens {
+  readonly range: VscodeNativeRange;
+  readonly command?: VscodeNativeCommand;
+}
+
+export interface VscodeNativeCodeLensProvider {
+  provideCodeLenses(
+    document: VscodeNativeTextDocument,
+  ): readonly VscodeNativeCodeLens[];
 }
 
 export interface VscodeNativeDiagnosticCollection extends VscodeDevtoolsDisposable {
@@ -50,6 +76,7 @@ export interface VscodeNativeTextEditor {
 
 export interface VscodeNativeWebview {
   html: string;
+  asWebviewUri?(uri: VscodeNativeUri): VscodeNativeUri;
   postMessage(message: unknown): boolean | Promise<boolean>;
   onDidReceiveMessage?(
     listener: (message: unknown) => void | Promise<void>,
@@ -70,6 +97,7 @@ export interface VscodeNativeWorkspaceEdit {
 
 export interface VscodeNativeExtensionContext {
   readonly subscriptions: VscodeDevtoolsDisposable[];
+  readonly extensionUri?: VscodeNativeUri;
 }
 
 export interface VscodeNativeApi {
@@ -81,6 +109,10 @@ export interface VscodeNativeApi {
   };
   readonly languages: {
     createDiagnosticCollection(name: string): VscodeNativeDiagnosticCollection;
+    registerCodeLensProvider?(
+      selector: unknown,
+      provider: VscodeNativeCodeLensProvider,
+    ): VscodeDevtoolsDisposable;
   };
   readonly window: {
     readonly activeTextEditor?: VscodeNativeTextEditor;
@@ -104,6 +136,7 @@ export interface VscodeNativeApi {
   };
   readonly Uri: {
     parse(uri: string): VscodeNativeUri;
+    joinPath?(base: VscodeNativeUri, ...pathSegments: string[]): VscodeNativeUri;
   };
   readonly Position: new (
     line: number,
@@ -118,6 +151,10 @@ export interface VscodeNativeApi {
     message: string,
     severity: unknown,
   ) => VscodeNativeDiagnostic;
+  readonly CodeLens?: new (
+    range: VscodeNativeRange,
+    command?: VscodeNativeCommand,
+  ) => VscodeNativeCodeLens;
   readonly DiagnosticSeverity: {
     readonly Error: unknown;
     readonly Warning: unknown;
@@ -133,6 +170,50 @@ export interface VscodeNativeExtension extends VscodeDevtoolsDisposable {
   readonly shell: VscodeDevtoolsShell;
   readonly diagnostics: VscodeNativeDiagnosticCollection;
 }
+
+interface VisualEditorLayoutUpdatedMessage {
+  readonly type: "LAYOUT_UPDATED";
+  readonly positions: Readonly<Record<string, MobxstateLayoutPosition>>;
+  readonly labelPositions?: Readonly<Record<string, MobxstateLayoutPosition>>;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const readLayoutPositions = (
+  value: unknown,
+): Readonly<Record<string, MobxstateLayoutPosition>> | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const positions: Record<string, MobxstateLayoutPosition> = {};
+
+  Object.entries(value).forEach(([id, position]) => {
+    if (!isRecord(position)) {
+      return;
+    }
+
+    const x = position.x;
+    const y = position.y;
+    if (id.length > 0 && typeof x === "number" && typeof y === "number") {
+      positions[id] = { x, y };
+    }
+  });
+
+  return positions;
+};
+
+const isLayoutUpdatedMessage = (
+  message: unknown,
+): message is VisualEditorLayoutUpdatedMessage => {
+  if (!isRecord(message) || message.type !== "LAYOUT_UPDATED") {
+    return false;
+  }
+
+  return readLayoutPositions(message.positions) !== undefined;
+};
 
 const mapSeverity = (
   api: VscodeNativeApi,
@@ -187,6 +268,94 @@ const toNativeDiagnostic = (
   return nativeDiagnostic;
 };
 
+const getWebviewMediaUri = (
+  api: VscodeNativeApi,
+  context: VscodeNativeExtensionContext | undefined,
+  panel: VscodeNativeWebviewPanel,
+  filename: string,
+): string | undefined => {
+  if (!context?.extensionUri || !api.Uri.joinPath || !panel.webview.asWebviewUri) {
+    return undefined;
+  }
+
+  return panel.webview
+    .asWebviewUri(api.Uri.joinPath(context.extensionUri, "media", filename))
+    .toString();
+};
+
+const getWebviewAssetOptions = (
+  api: VscodeNativeApi,
+  context: VscodeNativeExtensionContext | undefined,
+  panel: VscodeNativeWebviewPanel,
+): VscodeDevtoolsWebviewAssetOptions => {
+  return {
+    scriptUri: getWebviewMediaUri(
+      api,
+      context,
+      panel,
+      "mobxstate-visual-editor.js",
+    ),
+    styleUri: getWebviewMediaUri(
+      api,
+      context,
+      panel,
+      "mobxstate-visual-editor.css",
+    ),
+  };
+};
+
+const getWebviewPanelOptions = (
+  api: VscodeNativeApi,
+  context: VscodeNativeExtensionContext | undefined,
+): Record<string, unknown> => {
+  const mediaRoot =
+    context?.extensionUri && api.Uri.joinPath
+      ? api.Uri.joinPath(context.extensionUri, "media")
+      : undefined;
+
+  return {
+    enableScripts: true,
+    retainContextWhenHidden: true,
+    ...(mediaRoot ? { localResourceRoots: [mediaRoot] } : {}),
+  };
+};
+
+const codeLensDocumentSelector = [
+  { language: "typescript", scheme: "file" },
+  { language: "typescriptreact", scheme: "file" },
+  { language: "javascript", scheme: "file" },
+  { language: "javascriptreact", scheme: "file" },
+];
+
+const createOpenVisualEditorCodeLensProvider = (
+  api: VscodeNativeApi,
+  rememberDocument: (
+    document: VscodeNativeTextDocument,
+  ) => VscodeNativeTextDocument,
+): VscodeNativeCodeLensProvider | undefined => {
+  if (!api.CodeLens) {
+    return undefined;
+  }
+
+  return {
+    provideCodeLenses(document) {
+      const rememberedDocument = rememberDocument(document);
+      return findCreateMachineCalls(rememberedDocument.getText()).map((range) => {
+        return new api.CodeLens!(
+          toNativeRange(api, rememberedDocument, {
+            start: range.start,
+            end: range.start,
+          }),
+          {
+            title: "Open Visual Editor",
+            command: vscodeDevtoolsCommandIds.openVisualEditor,
+          },
+        );
+      });
+    },
+  };
+};
+
 export const createVscodeDevtoolsExtension = (
   api: VscodeNativeApi,
   context?: VscodeNativeExtensionContext,
@@ -237,19 +406,49 @@ export const createVscodeDevtoolsExtension = (
         getVscodeDevtoolsPanelViewType(payload.mode),
         getVscodeDevtoolsPanelTitle(payload.mode),
         api.ViewColumn.Beside,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-        },
+        getWebviewPanelOptions(api, context),
       );
 
       context?.subscriptions.push(panel);
-      panel.webview.html = createVscodeDevtoolsWebviewHtml(payload);
+      panel.webview.html = createVscodeDevtoolsWebviewHtml(
+        payload,
+        getWebviewAssetOptions(api, context, panel),
+      );
       await panel.webview.postMessage(payload);
 
       if (payload.mode === "visualEditor" && panel.webview.onDidReceiveMessage) {
         const session = createVisualEditorSession(payload.machine.config);
         const disposable = panel.webview.onDidReceiveMessage(async (message) => {
+          if (isLayoutUpdatedMessage(message)) {
+            const nativeUri = parseUri(payload.uri);
+            const document = rememberDocument(
+              await api.workspace.openTextDocument(nativeUri),
+            );
+            const workspaceEdit = new api.WorkspaceEdit();
+            const edit = createMobxstateLayoutTextEdit(
+              document.getText(),
+              payload.machine.ranges.config,
+              {
+                positions: readLayoutPositions(message.positions) ?? {},
+                labelPositions: readLayoutPositions(message.labelPositions),
+              },
+            );
+
+            workspaceEdit.replace(
+              nativeUri,
+              toNativeRange(api, document, edit.range),
+              edit.text,
+            );
+
+            const applied = await api.workspace.applyEdit(workspaceEdit);
+            if (!applied) {
+              throw new Error("VS Code rejected MobXstate layout edits.");
+            }
+
+            await panel.webview.postMessage({ type: "LAYOUT_SAVED" });
+            return;
+          }
+
           await panel.webview.postMessage(
             session.handleMessage(message as VisualEditorDraftCommandMessage),
           );
@@ -290,15 +489,30 @@ export const createVscodeDevtoolsExtension = (
   };
 
   const shell = createVscodeDevtoolsShell(host);
+  const codeLensProvider = createOpenVisualEditorCodeLensProvider(
+    api,
+    rememberDocument,
+  );
+  const codeLensDisposable =
+    codeLensProvider && api.languages.registerCodeLensProvider
+      ? api.languages.registerCodeLensProvider(
+          codeLensDocumentSelector,
+          codeLensProvider,
+        )
+      : undefined;
   const extension: VscodeNativeExtension = {
     shell,
     diagnostics: diagnosticsCollection,
     dispose() {
+      codeLensDisposable?.dispose();
       shell.dispose();
       diagnosticsCollection.dispose();
     },
   };
 
+  if (codeLensDisposable) {
+    context?.subscriptions.push(codeLensDisposable);
+  }
   context?.subscriptions.push(extension);
   return extension;
 };

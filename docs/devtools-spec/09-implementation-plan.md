@@ -139,10 +139,13 @@ Definition of Done:
 - `extensions/vscode` manifest scaffold с командами extension.
 - VS Code native adapter: activation wrapper, diagnostics collection mapping,
   webview panel host, `workspace.fs.writeFile` и `WorkspaceEdit` bridge.
-- VS Code extension build config и shared framework-free webview UI builder.
-- Inspector-first visual editor UI: host-side `DraftModel` session,
-  `DRAFT_COMMAND`/`DRAFT_UPDATED` webview protocol, state/transition forms,
-  undo/redo и export panel.
+- VS Code extension build config и shared webview UI builder.
+- Graph-first visual editor UI: React Flow webview bundle, host-side
+  `DraftModel` session, `DRAFT_COMMAND`/`DRAFT_UPDATED` webview protocol,
+  `Editor`/`Simulation` modes, draggable local node positions,
+  state/transition inspector forms и undo/redo.
+- Visual editor layout persistence: side-aware handles, custom edge labels and
+  `@mobxstate` layout metadata comments applied through VS Code `WorkspaceEdit`.
 
 Порядок:
 

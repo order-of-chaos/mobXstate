@@ -1,4 +1,8 @@
 import type { DevtoolsDiagnostic } from "./machineAnalyzer";
+import {
+  readMobxstateLayoutComment,
+  type MobxstateLayoutMetadata,
+} from "./layoutMetadata";
 import type {
   SourceDiagnostic,
   SourceDocumentSnapshot,
@@ -56,6 +60,7 @@ export interface VscodeDevtoolsPanelPayload {
   readonly documentVersion: number;
   readonly machine: SourceMachine;
   readonly diagnostics: readonly VscodeDevtoolsDiagnostic[];
+  readonly layout?: MobxstateLayoutMetadata;
 }
 
 export interface VscodeDevtoolsHost {
@@ -328,6 +333,10 @@ export const createVscodeDevtoolsShell = (
       documentVersion: analysis.document.version,
       machine: analysis.machine,
       diagnostics: analysis.diagnostics,
+      layout: readMobxstateLayoutComment(
+        analysis.document.text,
+        analysis.machine.ranges.config,
+      ),
     });
 
     return {

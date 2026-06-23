@@ -1,5 +1,6 @@
 node_modules/
 dist/
+extensions/vscode/media/
 .DS_Store
 .env
 .env.*
@@ -7,3 +8,4 @@ npm-debug.log*
 coverage/
 tmp
 .superpowers/
+/extensions/vscode/*.vsix

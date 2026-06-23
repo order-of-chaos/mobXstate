@@ -18,8 +18,10 @@ Analyzer, source reader, type compiler и worker protocol не должны
 дублироваться внутри extension adapter.
 
 Текущий срез содержит manifest команд, `src/extension.ts`, webview host,
-shared webview UI builder, Inspector-first visual editor controls,
+shared webview UI builder, graph-first React Flow visual editor bundle,
+`Editor`/`Simulation` UI modes, draggable local node positions,
 adapter-level smoke tests через fake VS Code API и
-`npm --prefix extensions/vscode run build` для генерации `dist/extension.js`.
+`npm --prefix extensions/vscode run build` для генерации `dist/extension.js`
+и `media/mobxstate-visual-editor.{js,css}`.
 Следующий срез должен добавить source patch preview для accepted editor
 changes.

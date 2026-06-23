@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createVscodeDevtoolsExtension,
   createVscodeDevtoolsWebviewHtml,
+  decodeMobxstateLayoutComment,
   vscodeDevtoolsCommandIds,
   type SourceTextEdit,
   type VscodeDevtoolsPanelPayload,
@@ -60,6 +61,20 @@ class FakeDiagnostic {
   }
 }
 
+class FakeCodeLens {
+  public constructor(
+    range: unknown,
+    public readonly command: {
+      readonly title: string;
+      readonly command: string;
+    } | undefined,
+  ) {
+    this.range = range as FakeRange;
+  }
+
+  public readonly range: FakeRange;
+}
+
 class FakeWorkspaceEdit {
   public readonly replacements: Array<{
     readonly uri: FakeUri;
@@ -113,12 +128,18 @@ const createFakeVscode = () => {
   );
   const commands = new Map<string, () => Promise<unknown>>();
   const diagnostics = new Map<string, readonly FakeDiagnostic[]>();
+  const codeLensProviders: Array<{
+    readonly selector: unknown;
+    readonly provider: {
+      provideCodeLenses(document: FakeTextDocument): readonly FakeCodeLens[];
+    };
+  }> = [];
   const panels: Array<{
     readonly viewType: string;
     readonly title: string;
     readonly html: string;
     readonly messages: unknown[];
-    receive(message: unknown): void;
+    receive(message: unknown): Promise<void>;
   }> = [];
   const writes: Array<{ readonly uri: string; readonly text: string }> = [];
   const appliedEdits: FakeWorkspaceEdit[] = [];
@@ -146,6 +167,23 @@ const createFakeVscode = () => {
           },
         };
       },
+      registerCodeLensProvider(
+        selector: unknown,
+        provider: {
+          provideCodeLenses(document: FakeTextDocument): readonly FakeCodeLens[];
+        },
+      ) {
+        const entry = { selector, provider };
+        codeLensProviders.push(entry);
+        return {
+          dispose() {
+            const index = codeLensProviders.indexOf(entry);
+            if (index >= 0) {
+              codeLensProviders.splice(index, 1);
+            }
+          },
+        };
+      },
     },
     window: {
       activeTextEditor: {
@@ -153,14 +191,14 @@ const createFakeVscode = () => {
       },
       createWebviewPanel(viewType: string, title: string) {
         const messages: unknown[] = [];
-        const listeners: Array<(message: unknown) => void> = [];
+        const listeners: Array<(message: unknown) => void | Promise<void>> = [];
         const panel = {
           viewType,
           title,
           html: "",
           messages,
-          receive(message: unknown) {
-            listeners.forEach((listener) => listener(message));
+          async receive(message: unknown) {
+            await Promise.all(listeners.map((listener) => listener(message)));
           },
         };
         panels.push(panel);
@@ -222,6 +260,7 @@ const createFakeVscode = () => {
     Position: FakePosition,
     Range: FakeRange,
     Diagnostic: FakeDiagnostic,
+    CodeLens: FakeCodeLens,
     DiagnosticSeverity: {
       Error: "error",
       Warning: "warning",
@@ -238,6 +277,7 @@ const createFakeVscode = () => {
     document,
     commands,
     diagnostics,
+    codeLensProviders,
     panels,
     writes,
     appliedEdits,
@@ -260,6 +300,23 @@ describe("VS Code native devtools adapter", () => {
 
     extension.dispose();
     expect(harness.commands.size).toBe(0);
+  });
+
+  it("registers CodeLens links for opening the visual editor from createMachine", () => {
+    const harness = createFakeVscode();
+    createVscodeDevtoolsExtension(harness.api, harness.context);
+
+    expect(harness.codeLensProviders).toHaveLength(1);
+    const codeLenses = harness.codeLensProviders[0]?.provider.provideCodeLenses(
+      harness.document,
+    );
+
+    expect(codeLenses).toHaveLength(1);
+    expect(codeLenses?.[0]?.command).toEqual({
+      title: "Open Visual Editor",
+      command: vscodeDevtoolsCommandIds.openVisualEditor,
+    });
+    expect(codeLenses?.[0]?.range.start.line).toBe(2);
   });
 
   it("maps diagnostics into a native diagnostic collection", async () => {
@@ -354,19 +411,23 @@ describe("VS Code native devtools adapter", () => {
         expect(html).toContain("nativeAdapter");
         expect(html).toContain('data-mobxstate-devtools-ui="vscode-webview"');
         expect(html).toContain('data-panel-mode="visualEditor"');
-        expect(html).toContain('data-testid="state-list"');
-        expect(html).toContain('data-testid="transition-list"');
-        expect(html).toContain('data-testid="diagnostic-list"');
+        expect(html).toContain('data-ui-mode="editor"');
+        expect(html).toContain(">Simulation</button>");
+        expect(html).not.toContain(">Viewer</button>");
+        expect(html).not.toContain('data-testid="state-list"');
+        expect(html).not.toContain('data-testid="transition-list"');
+        expect(html).not.toContain('data-testid="diagnostic-list"');
+        expect(html).not.toContain('data-testid="export-panel"');
+        expect(html).toContain('data-testid="state-graph"');
+        expect(html).toContain('id="mobxstate-webview-root"');
+        expect(html).toContain("mobxstate-visual-editor.js");
         expect(html).toContain('data-testid="editor-toolbar"');
         expect(html).toContain('data-testid="state-inspector-form"');
         expect(html).toContain('data-testid="transition-inspector-form"');
-        expect(html).toContain('data-testid="export-panel"');
         expect(html).toContain('data-editor-command="addState"');
         expect(html).toContain('data-editor-command="addTransition"');
         expect(html).toContain('data-editor-command="undo"');
         expect(html).toContain('data-editor-command="redo"');
-        expect(html).toContain("stateCount");
-        expect(html).toContain("transitionCount");
         expect(html).not.toContain("<script>{");
         extension.dispose();
       });
@@ -397,5 +458,38 @@ describe("VS Code native devtools adapter", () => {
     expect(lastMessage?.graph?.nodes.map((node) => node.id)).toContain(
       "nativeAdapter.drafted",
     );
+  });
+
+  it("persists visual editor node positions as layout metadata", async () => {
+    const harness = createFakeVscode();
+    createVscodeDevtoolsExtension(harness.api, harness.context);
+
+    await harness.commands.get(vscodeDevtoolsCommandIds.openVisualEditor)?.();
+    const [panel] = harness.panels;
+    expect(panel).toBeDefined();
+
+    await panel?.receive({
+      type: "LAYOUT_UPDATED",
+      positions: {
+        "nativeAdapter.idle": { x: 122.8, y: 56.2 },
+        "nativeAdapter.loading": { x: 420, y: 160 },
+      },
+      labelPositions: {
+        "nativeAdapter.idle:on:START:0": { x: 260.4, y: 62.6 },
+      },
+    });
+
+    expect(harness.appliedEdits).toHaveLength(1);
+    const replacement = harness.appliedEdits[0]?.replacements[0]?.text;
+    const metadata = decodeMobxstateLayoutComment(replacement ?? "");
+    expect(replacement).toContain("@mobxstate");
+    expect(metadata?.positions["nativeAdapter.idle"]).toEqual({ x: 123, y: 56 });
+    expect(metadata?.labelPositions?.["nativeAdapter.idle:on:START:0"]).toEqual({
+      x: 260,
+      y: 63,
+    });
+    expect(panel?.messages[panel.messages.length - 1]).toEqual({
+      type: "LAYOUT_SAVED",
+    });
   });
 });

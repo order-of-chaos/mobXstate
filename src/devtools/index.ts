@@ -44,6 +44,12 @@ export {
   createVisualEditorSession,
   formatVisualEditorExport,
 } from "./visualEditorSession";
+export {
+  createMobxstateLayoutTextEdit,
+  decodeMobxstateLayoutComment,
+  encodeMobxstateLayoutComment,
+  readMobxstateLayoutComment,
+} from "./layoutMetadata";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -159,3 +165,8 @@ export type {
   VisualEditorDraftSnapshot,
   VisualEditorSession,
 } from "./visualEditorSession";
+export type {
+  MobxstateLayoutMetadata,
+  MobxstateLayoutMetadataInput,
+  MobxstateLayoutPosition,
+} from "./layoutMetadata";

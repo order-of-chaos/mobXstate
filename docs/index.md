@@ -23,7 +23,7 @@ example entrypoints.
 
 ## Package Shape
 
-- `createMachine(...)` keeps the machine config close to XState authoring.
+- `createMachine(...)` keeps the machine config close to statechart authoring.
 - `MobXStateMachine` keeps data, actions, guards, delays, and effects in the
   MobX store.
 - `MachineOptions` remains available as a compatibility and override layer.

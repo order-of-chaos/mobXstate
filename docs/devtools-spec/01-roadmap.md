@@ -169,7 +169,7 @@ Zed Integration
 
 - Source patching сложнее, чем canvas editing. Его нельзя делать частью MVP.
 - Type compiler должен учитывать MobX-first model, иначе он начнет тянуть
-  XState assumptions.
+  external runtime assumptions.
 - IDE-плагины имеют разную модель UI. Общий core и общий web bundle должны
   появиться до IDE-этапов.
 - Visual editor без хороших diagnostics будет создавать нерабочие config.

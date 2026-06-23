@@ -28,8 +28,8 @@ export const pt = {
     "Describe events and the statechart": "Descreva eventos e o statechart",
     Documentation: "Documentação",
     "Documentation on one page": "Documentação em uma página",
-    "Does not try to cover the entire XState runtime surface.":
-      "Não tenta cobrir toda a superfície do runtime XState.",
+    "Focused on MobX-first statechart workflows.":
+      "Focado em workflows statechart MobX-first.",
     "Events type the inputs; config describes states, transitions, <code>entry</code>, <code>exit</code>, <code>after</code>, <code>always</code> and <code>invoke</code>.":
       "Eventos tipam as entradas; config descreve states, transitions, <code>entry</code>, <code>exit</code>, <code>after</code>, <code>always</code> e <code>invoke</code>.",
     "Explicit events and pure updates.": "Eventos explícitos e updates puros.",
@@ -85,13 +85,13 @@ export const pt = {
       "Esta tabela descreve tradeoffs práticos sem fingir que uma abordagem é universal. Se a aplicação já usa MobX, MobXstate adiciona um modelo de processo explícito sem mover comportamento para um runtime context separado.",
     Tradeoff: "Tradeoff",
     Typed: "Tipado",
-    "Unofficial library for MobX; not affiliated with MobX, Stately or XState.":
-      "Biblioteca não oficial para MobX; sem afiliação com MobX, Stately ou XState.",
+    "Unofficial library for MobX.":
+      "Biblioteca não oficial para MobX.",
     "When to choose": "Quando escolher",
     "Why it is useful": "Por que é útil",
-    "XState runtime dependency": "Dependência de runtime XState",
-    "You need the full XState surface or the app is built around actors.":
-      "Você precisa da superfície completa do XState ou a aplicação é construída em torno de actors.",
+    "External runtime dependency": "Dependência de runtime externo",
+    "You need a broad actor runtime or the app is built around actors.":
+      "Você precisa de um actor runtime amplo ou a aplicação é construída em torno de actors.",
     "<code>invoke</code> starts a store method that may return a promise, cleanup function or child machine.":
       "<code>invoke</code> inicia um método do store que pode retornar uma promise, cleanup function ou child machine.",
     "<code>send(\"RESET\")</code> works for payloadless events, while payload events require an object.":

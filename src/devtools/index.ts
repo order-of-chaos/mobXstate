@@ -10,6 +10,13 @@ export {
   createSimulatorEventPalette,
 } from "./simulator";
 export { createDraftModel, validateDraftConfig } from "./draftModel";
+export {
+  compileMobxstateTypes,
+  createTypegenDiagnostics,
+  createTypegenMachineData,
+  printTypegenModule,
+  shouldWriteTypegenFile,
+} from "./typeCompiler";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -48,3 +55,12 @@ export type {
   DraftTransitionPatch,
   DraftTransitionTrigger,
 } from "./draftModel";
+export type {
+  PrintTypegenModuleOptions,
+  TypegenDiagnostic,
+  TypegenDiagnosticCode,
+  TypegenMachineData,
+  TypegenMachineInput,
+  TypegenResult,
+  TypegenWriteDecision,
+} from "./typeCompiler";

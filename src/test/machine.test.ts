@@ -1015,7 +1015,7 @@ describe("MobXStateMachine", () => {
     const activity = new LifecycleState();
 
     await activity.ready;
-    expect(activity.effectEvents).toEqual(["xstate.init"]);
+    expect(activity.effectEvents).toEqual(["mobxstate.init"]);
 
     activity.send({ type: "STOP" });
 

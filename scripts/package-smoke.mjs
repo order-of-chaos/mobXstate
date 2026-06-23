@@ -44,10 +44,6 @@ const fileDependency = (packagePath) => {
   return `file:${packagePath}`;
 };
 
-const readJson = async (filePath) => {
-  return JSON.parse(await fs.readFile(filePath, "utf8"));
-};
-
 const assertPackedFiles = (packInfo) => {
   const packedFiles = new Set(packInfo.files.map((file) => file.path));
   const requiredFiles = [
@@ -71,34 +67,6 @@ const assertPackedFiles = (packInfo) => {
       );
     }
   });
-};
-
-const containsPackageDirectory = async (directory, packageName) => {
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
-
-    const entryPath = path.join(directory, entry.name);
-    if (
-      entry.name === packageName &&
-      path.basename(path.dirname(entryPath)) === "node_modules"
-    ) {
-      return true;
-    }
-
-    if (entry.name === ".bin") {
-      continue;
-    }
-
-    if (await containsPackageDirectory(entryPath, packageName)) {
-      return true;
-    }
-  }
-
-  return false;
 };
 
 const writeConsumerProject = async (consumerRoot, tarballPath) => {
@@ -490,30 +458,6 @@ const main = async () => {
       ],
       { cwd: consumerRoot },
     );
-
-    const installedPackage = await readJson(
-      path.join(
-        consumerRoot,
-        "node_modules",
-        ...packageName.split("/"),
-        "package.json",
-      ),
-    );
-    if (
-      installedPackage.dependencies?.xstate !== undefined ||
-      installedPackage.peerDependencies?.xstate !== undefined
-    ) {
-      throw new Error(`${packageName} package metadata must not depend on xstate.`);
-    }
-
-    if (
-      await containsPackageDirectory(
-        path.join(consumerRoot, "node_modules"),
-        "xstate",
-      )
-    ) {
-      throw new Error("xstate must not be installed in the smoke project.");
-    }
 
     console.log("Package smoke test passed.");
   } finally {

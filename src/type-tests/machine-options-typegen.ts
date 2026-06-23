@@ -6,7 +6,7 @@ type TableEvent =
   | { type: "LOAD_USER"; payload: { userId: string } };
 
 interface Typegen0 {
-  "@@xstate/typegen": true;
+  "@@mobxstate/typegen": true;
   internalEvents: Record<string, never>;
   invokeSrcNameMap: Record<string, never>;
   missingImplementations: {

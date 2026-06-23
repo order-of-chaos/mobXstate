@@ -15,14 +15,13 @@ release.
 - Use `effects` as the public name for invoke fallbacks. Done.
 - Remove `MachineOptions.services` and callback-style invoke services. Done.
 - Remove `MachineOptions.activities` and state node `activities`. Done.
-- Update docs to use `statechart-shaped` and `Stately-compatible` wording
-  instead of implying an XState runtime dependency. Done.
+- Update docs to use `statechart-shaped` wording. Done.
 - Add a feature support table:
   - supported: `entry`, `exit`, named actions, guards, delays, `after`,
     `always`, `invoke`, promise effects, cleanup effects, child machines,
     parallel states, final states, shallow history;
   - removed: `services`, `activities`;
-  - unsupported or explicit error: deep history, advanced XState-only runtime
+  - unsupported or explicit error: deep history, advanced external runtime
     features. Done.
 
 Done when:
@@ -30,7 +29,7 @@ Done when:
 - the README shows only store methods/getters/effects in primary examples;
 - removed APIs are documented as removed;
 - no example uses `services` or `activities`;
-- package wording does not imply `xstate` is a dependency.
+- package wording does not imply an external statechart runtime dependency.
 
 ## Phase 2: Strict Runtime Validation
 
@@ -121,12 +120,12 @@ Goal: make the package reliable for real consumers.
   - ESM import. Done;
   - CJS require. Done;
   - TypeScript type import. Done;
-  - verify no `xstate` dependency. Done.
+  - verify no external statechart runtime dependency. Done.
 - Add `repository`, `bugs` and `homepage` metadata. Done; verify the final
   GitHub URL before publish.
 - Reconsider package keywords:
   - keep `stately` and `statechart`;
-  - use `xstate` only if compatibility wording is clear.
+  - use only MobXstate wording in package metadata.
 - Confirm `mobx` remains a peer dependency and a dev/test dependency. Done.
 - Document supported Node and TypeScript versions. Done.
 
@@ -140,8 +139,7 @@ Done when:
 
 Before publishing:
 
-1. Decide whether the `xstate` keyword should stay for Stately discoverability
-   or be removed to avoid compatibility confusion.
+1. Keep package metadata focused on MobXstate discoverability.
 2. Explore store-method type helpers after the package release path is stable.
 
 That keeps the first npm release focused on a stable install and import story.

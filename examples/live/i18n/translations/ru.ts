@@ -28,8 +28,8 @@ export const ru = {
     "Describe events and the statechart": "Опишите события и statechart",
     "Documentation": "Документация",
     "Documentation on one page": "Документация на одной странице",
-    "Does not try to cover the entire XState runtime surface.":
-      "Не стремится покрыть весь XState runtime surface.",
+    "Focused on MobX-first statechart workflows.":
+      "Сфокусирован на MobX-first statechart workflows.",
     "Events type the inputs; config describes states, transitions, <code>entry</code>, <code>exit</code>, <code>after</code>, <code>always</code> and <code>invoke</code>.":
       "События типизируют входы, config описывает states, transitions, <code>entry</code>, <code>exit</code>, <code>after</code>, <code>always</code> и <code>invoke</code>.",
     "Explicit events and pure updates.": "Явные events и pure updates.",
@@ -85,13 +85,13 @@ export const ru = {
       "Таблица описывает практические tradeoffs без попытки объявить один подход универсальным. Если приложение уже построено на MobX, MobXstate добавляет явную модель процесса без выноса поведения в отдельный runtime context.",
     "Tradeoff": "Цена подхода",
     "Typed": "Типизировано",
-    "Unofficial library for MobX; not affiliated with MobX, Stately or XState.":
-      "Неофициальная библиотека для MobX; не связана с MobX, Stately или XState.",
+    "Unofficial library for MobX.":
+      "Неофициальная библиотека для MobX.",
     "When to choose": "Когда выбирать",
     "Why it is useful": "Почему это удобно",
-    "XState runtime dependency": "XState runtime dependency",
-    "You need the full XState surface or the app is built around actors.":
-      "Нужен полный XState surface или приложение строится вокруг actors.",
+    "External runtime dependency": "External runtime dependency",
+    "You need a broad actor runtime or the app is built around actors.":
+      "Нужен широкий actor runtime или приложение строится вокруг actors.",
     "<code>invoke</code> starts a store method that may return a promise, cleanup function or child machine.":
       "<code>invoke</code> запускает метод store, который может вернуть promise, cleanup function или child machine.",
     "<code>send(\"RESET\")</code> works for payloadless events, while payload events require an object.":

@@ -3,8 +3,7 @@
 MobXstate adds finite state machines to MobX stores with a statechart-shaped,
 Stately-friendly machine config and without a separate machine context.
 
-MobXstate is an unofficial library for MobX. It is not affiliated with MobX,
-Stately or XState.
+MobXstate is an unofficial library for MobX.
 
 ## Install
 

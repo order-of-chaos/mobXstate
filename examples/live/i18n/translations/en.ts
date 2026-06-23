@@ -55,8 +55,8 @@ export const en = {
     "Describe events and the statechart": "Describe events and the statechart",
     Documentation: "Documentation",
     "Documentation on one page": "Documentation on one page",
-    "Does not try to cover the entire XState runtime surface.":
-      "Does not try to cover the entire XState runtime surface.",
+    "Focused on MobX-first statechart workflows.":
+      "Focused on MobX-first statechart workflows.",
     Dog: "Dog",
     "Dog Walk": "Dog Walk",
     Drinking: "Drinking",
@@ -164,8 +164,8 @@ export const en = {
     Tradeoff: "Tradeoff",
     "Traffic Light": "Traffic Light",
     Typed: "Typed",
-    "Unofficial library for MobX; not affiliated with MobX, Stately or XState.":
-      "Unofficial library for MobX; not affiliated with MobX, Stately or XState.",
+    "Unofficial library for MobX.":
+      "Unofficial library for MobX.",
     Vet: "Vet",
     "Vet check": "Vet check",
     "Vet visit": "Vet visit",
@@ -175,9 +175,9 @@ export const en = {
     Water: "Water",
     "When to choose": "When to choose",
     "Why it is useful": "Why it is useful",
-    "XState runtime dependency": "XState runtime dependency",
-    "You need the full XState surface or the app is built around actors.":
-      "You need the full XState surface or the app is built around actors.",
+    "External runtime dependency": "External runtime dependency",
+    "You need a broad actor runtime or the app is built around actors.":
+      "You need a broad actor runtime or the app is built around actors.",
     cat: "cat",
     cleanups: "cleanups",
     dog: "dog",

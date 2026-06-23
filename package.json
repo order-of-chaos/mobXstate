@@ -16,7 +16,6 @@
   "keywords": [
     "mobx",
     "typescript",
-    "xstate",
     "statechart",
     "statecharts",
     "state-machine",
@@ -58,6 +57,7 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false && tsc -p tsconfig.test.json && tsc -p tsconfig.type-tests.json && tsc -p tsconfig.examples.json",
     "build": "npm run clean && tsc && vite build",
+    "devtools": "node scripts/mobxstate-devtools.mjs",
     "pages:build": "node ./scripts/build-pages.mjs",
     "lint": "eslint src examples --report-unused-disable-directives --max-warnings 0",
     "pack:dry-run": "npm pack --dry-run",

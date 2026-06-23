@@ -1,9 +1,7 @@
 # MobXstate
 
 MobXstate добавляет MobX-сторам конечные автоматы со statechart-shaped API.
-Конфигурация машины остается Stately-friendly, поэтому Stately/XState VSCode
-extension видит `createMachine(...)`, умеет открыть visual editor и генерировать
-typegen. Исполняется это собственным runtime MobXstate, без XState interpreter.
+Конфигурация машины исполняется собственным runtime MobXstate.
 Runtime не использует отдельный machine context: данные и бизнес-логика живут в
 MobX-объекте.
 
@@ -64,7 +62,7 @@ properties самого store. `MachineOptions.effects` остается fallbac
 | Поддерживается | `entry`, `exit`, named actions, named guards, named delays, numeric delays, `after`, `always`, `invoke`, promise effects, cleanup effects, child machines, nested states, parallel states, final states, shallow history, `onDone`, `onError`, typed `send`, persistence validation и persistence versioning. |
 | Удалено | `MachineOptions.services`, `MachineOptions.activities`, state node `activities` и callback invoke services. Для lifecycle-кода используйте методы store или `MachineOptions.effects`. |
 | Явная ошибка | Deep history через `history: "deep"` выбрасывает ошибку при создании runtime config. |
-| Вне scope | Отдельный XState-style machine `context`. В MobXstate контекстом являются поля, getters и методы MobX store. |
+| Вне scope | Отдельный machine `context`. В MobXstate контекстом являются поля, getters и методы MobX store. |
 
 ## Использование
 
@@ -128,7 +126,7 @@ class CounterStore extends MobXStateMachine<CounterStore, CounterEvent> {
 
 ## Важное ограничение
 
-`createMachine` специально сохраняет форму XState config. Реализации лучше
+`createMachine` специально сохраняет statechart-shaped config. Реализации лучше
 размещать прямо в MobX store. `MachineOptions.effects` нужен в основном как
 override layer.
 

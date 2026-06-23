@@ -5,7 +5,7 @@ type CheckoutEvent =
   | { type: "SUBMIT_PAYMENT"; payload: { paymentId: string } };
 
 interface CheckoutTypegen {
-  "@@xstate/typegen": true;
+  "@@mobxstate/typegen": true;
   internalEvents: Record<string, never>;
   invokeSrcNameMap: Record<string, never>;
   missingImplementations: {

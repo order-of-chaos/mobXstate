@@ -1253,7 +1253,7 @@ const mount = (): void => {
               <a class="btn btn-light" href="#docs">${t("Start in 3 steps")}</a>
             </div>
             <p class="disclaimer">
-              ${t("Unofficial library for MobX; not affiliated with MobX, Stately or XState.")}
+              ${t("Unofficial library for MobX.")}
             </p>
           </div>
 
@@ -1296,7 +1296,7 @@ const mount = (): void => {
         <div class="section-inner metric-grid" aria-label="MobXstate highlights">
           <div>
             <strong>0</strong>
-            <span>${t("XState runtime dependency")}</span>
+            <span>${t("External runtime dependency")}</span>
           </div>
           <div>
             <strong>1</strong>
@@ -1378,7 +1378,7 @@ const mount = (): void => {
             <div class="comparison-row" role="row">
               <strong role="cell">MobXstate</strong>
               <span role="cell">${t("Statechart + MobX store methods, typed events, observable runtime state.")}</span>
-              <span role="cell">${t("Does not try to cover the entire XState runtime surface.")}</span>
+              <span role="cell">${t("Focused on MobX-first statechart workflows.")}</span>
               <span role="cell">${t("A MobX app where workflows should be explicit and testable.")}</span>
             </div>
             <div class="comparison-row" role="row">
@@ -1388,10 +1388,10 @@ const mount = (): void => {
               <span role="cell">${t("A form, CRUD screen or view without a strict lifecycle.")}</span>
             </div>
             <div class="comparison-row" role="row">
-              <strong role="cell">XState runtime</strong>
+              <strong role="cell">External actor runtime</strong>
               <span role="cell">${t("Full actor/statechart model and a rich state machine ecosystem.")}</span>
               <span role="cell">${t("Separate context/actions/effects next to MobX require an integration layer.")}</span>
-              <span role="cell">${t("You need the full XState surface or the app is built around actors.")}</span>
+              <span role="cell">${t("You need a broad actor runtime or the app is built around actors.")}</span>
             </div>
             <div class="comparison-row" role="row">
               <strong role="cell">Reducers</strong>

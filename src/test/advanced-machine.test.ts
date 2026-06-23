@@ -841,7 +841,7 @@ class ManualEditorState extends MobXStateMachine<
   }
 }
 
-describe("MobXStateMachine advanced XState behavior", () => {
+describe("MobXStateMachine advanced statechart behavior", () => {
   afterEach(() => {
     vi.useRealTimers();
   });

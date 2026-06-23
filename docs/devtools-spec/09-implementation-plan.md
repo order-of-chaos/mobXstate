@@ -87,7 +87,7 @@ Definition of Done:
 
 ### Этап 5. Type compiler и CLI
 
-Статус: следующий этап.
+Статус: готово.
 
 Результат:
 
@@ -105,6 +105,8 @@ Definition of Done:
 - no-op typegen не пишет файл.
 
 ### Этап 6. Source reader и worker
+
+Статус: следующий этап.
 
 Результат:
 
@@ -143,6 +145,7 @@ Milestone считается закрытым, когда в основном pa
 - runtime bridge;
 - simulator controller;
 - draft editor model;
+- type compiler и local CLI;
 - focused tests;
 - публичные экспорты из `src/index.ts`;
 - зеленые `npm test`, `npm run typecheck`, `npm run lint`.

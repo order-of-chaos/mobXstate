@@ -85,4 +85,4 @@ shape and share the same state machine runtime.
 - Removed: `MachineOptions.services`, `MachineOptions.activities`, state node
   `activities`, and callback invoke services.
 - Explicit runtime error: `history: "deep"`.
-- Out of scope: separate XState-style machine `context` runtime.
+- Out of scope: separate machine `context` runtime.

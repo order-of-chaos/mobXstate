@@ -2,7 +2,7 @@
 
 Этот каталог описывает последовательное ТЗ на собственный визуальный devtools
 для MobXstate. Цель - построить инструмент в терминах MobXstate, без
-копирования Stately Studio и без зависимости от XState runtime.
+копирования внешних studio/runtime продуктов.
 
 MobXstate devtools должен помогать автору видеть, запускать и изменять
 `MachineConfig`, где:
@@ -33,7 +33,7 @@ MobXstate devtools должен помогать автору видеть, за
 7. [07-testing-and-acceptance.md](./07-testing-and-acceptance.md) - общая
    стратегия тестирования, acceptance criteria и release gates.
 8. [08-source-derived-architecture-notes.md](./08-source-derived-architecture-notes.md)
-   - архитектурные уроки из изученных исходников Stately/XState extension,
+   - архитектурные уроки из изученных IDE extension исходников,
    применимые к MobXstate devtools.
 9. [09-implementation-plan.md](./09-implementation-plan.md) - порядок
    реализации devtools по проверяемым слоям и Definition of Done для каждого
@@ -44,7 +44,7 @@ MobXstate devtools должен помогать автору видеть, за
 - Термины интерфейса должны говорить о MobXstate: machine, state node,
   transition, store action, store guard, store delay, store effect, snapshot,
   persisted state.
-- Нельзя обещать полную совместимость с XState. Поддерживается только текущий
+- Нельзя обещать полную совместимость с внешними runtime. Поддерживается только текущий
   public surface MobXstate.
 - Первый результат должен работать вне IDE. IDE-плагины подключаются к тому же
   core, а не содержат собственную бизнес-логику.
@@ -56,9 +56,8 @@ MobXstate devtools должен помогать автору видеть, за
   `MachineConfig` целиком. Source patcher сам решает, какие AST-ranges можно
   менять безопасно.
 - Type compiler не пишет generated files, если их содержимое не изменилось.
-- Type compiler должен улучшать MobXstate-типизацию, но не обязан повторять
-  XState typegen буквально. Поле `@@xstate/typegen` остается техническим
-  compatibility-detail, не продуктовым термином.
+- Type compiler должен улучшать MobXstate-типизацию и использовать
+  MobXstate-specific typegen markers.
 
 ## Верхнеуровневая схема
 
@@ -97,4 +96,4 @@ IDE shells: VS Code -> WebStorm -> Zed
 - Совместная работа нескольких пользователей.
 - Автоматическое исправление любого произвольного TypeScript-файла.
 - Редактирование store-методов внутри визуального canvas.
-- Поддержка XState-only runtime features, которые MobXstate не исполняет.
+- Поддержка runtime features, которые MobXstate не исполняет.

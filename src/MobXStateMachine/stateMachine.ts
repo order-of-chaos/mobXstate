@@ -25,11 +25,11 @@ export type MachineSendEvent<Event extends EventObject> =
 export type MachineStateValue = string | { [key: string]: MachineStateValue };
 
 export interface TypegenDisabled {
-  "@@xstate/typegen"?: false;
+  "@@mobxstate/typegen"?: false;
 }
 
 export interface TypegenMeta {
-  "@@xstate/typegen": true;
+  "@@mobxstate/typegen": true;
   internalEvents: object;
   invokeSrcNameMap?: object;
   missingImplementations?: object;
@@ -55,7 +55,7 @@ export interface MachineActionObject {
 export interface MachineSendAction<
   Event extends EventObject = EventObject,
 > extends MachineActionObject {
-  type: "xstate.send";
+  type: "mobxstate.send";
   event: Event;
   to?: string;
   id?: string;
@@ -66,7 +66,7 @@ export const sendTo = <Event extends EventObject>(
   options: { to?: string } = {},
 ): MachineSendAction<Event> => {
   return {
-    type: "xstate.send",
+    type: "mobxstate.send",
     event,
     ...(options.to === undefined ? {} : { to: options.to }),
     id: event.type,

@@ -232,7 +232,7 @@ be tracked once baseline tests exist.
 - No continued source editing against stale AST after a patch.
 - No generated typegen write when generated output is unchanged.
 - No IDE-specific fork of analyzer logic.
-- No hidden dependency on XState runtime.
+- No hidden dependency on external statechart runtime.
 - No silent drop of supported `MachineConfig` fields during export.
 
 ## Documentation requirements

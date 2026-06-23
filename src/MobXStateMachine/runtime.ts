@@ -93,7 +93,7 @@ interface NodeEffects<Event extends EventObject> {
 }
 
 interface SendActionObject extends MachineActionObject {
-  type: "xstate.send";
+  type: "mobxstate.send";
   event: unknown;
   to?: unknown;
 }
@@ -156,7 +156,7 @@ const isRuntimeMachine = (value: unknown): value is RuntimeMachine => {
 
 const isSendActionObject = (
   action: MachineActionObject,
-): action is SendActionObject => action.type === "xstate.send";
+): action is SendActionObject => action.type === "mobxstate.send";
 
 const isActionObject = (value: unknown): value is MachineActionObject => {
   return isObjectRecord(value) && typeof value.type === "string";
@@ -633,7 +633,7 @@ export class MachineActor<
     this.completed.clear();
     this.activePaths = this.resolveInitialValue(value);
 
-    const initEvent = eventFromType<Event>("xstate.init");
+    const initEvent = eventFromType<Event>("mobxstate.init");
     this.processing = true;
     try {
       this.runMacrostep(() => {
@@ -659,7 +659,7 @@ export class MachineActor<
       return;
     }
 
-    const stopEvent = eventFromType<Event>("xstate.stop");
+    const stopEvent = eventFromType<Event>("mobxstate.stop");
     try {
       this.runMacrostep(() => {
         this.getExitNodes(this.root, []).forEach((node) => {
@@ -1174,7 +1174,7 @@ export class MachineActor<
         }
 
         const delayedEvent = eventFromType<Event>(
-          `xstate.after(${delayName})#${this.machine.id}.${pathKey(node.path)}`,
+          `mobxstate.after(${delayName})#${this.machine.id}.${pathKey(node.path)}`,
         );
         const picked = this.pickTransition(transition, delayedEvent);
 

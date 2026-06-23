@@ -142,8 +142,8 @@ const isRuntimeMachine = (value: unknown): value is RuntimeMachine => {
 
 const isSendActionObject = (
   action: MachineActionObject,
-): action is MachineActionObject & { type: "xstate.send" } => {
-  return action.type === "xstate.send";
+): action is MachineActionObject & { type: "mobxstate.send" } => {
+  return action.type === "mobxstate.send";
 };
 
 const normalizeActionReferences = (

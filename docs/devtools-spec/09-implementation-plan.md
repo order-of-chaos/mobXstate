@@ -145,7 +145,8 @@ Definition of Done:
   `Editor`/`Simulation` modes, draggable local node positions,
   state/transition inspector forms и undo/redo.
 - Visual editor layout persistence: side-aware handles, custom edge labels and
-  `@mobxstate` layout metadata comments applied through VS Code `WorkspaceEdit`.
+  compressed `@mobxstate` layout metadata comments applied through VS Code
+  `WorkspaceEdit`, then restored from source when the editor is reopened.
 
 Порядок:
 

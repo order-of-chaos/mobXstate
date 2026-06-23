@@ -25,7 +25,9 @@ describe("devtools layout metadata", () => {
       },
     });
 
-    expect(encoded).toMatch(/^\/\*\* @mobxstate [A-Za-z0-9_-]+ \*\*\/$/);
+    expect(encoded).toMatch(/^\/\*\* @mobxstate [A-Za-z0-9_+$-]+ \*\*\/$/);
+    expect(encoded).toMatch(/^\/\*\* @mobxstate N4/);
+    expect(encoded).not.toContain("eyJ");
     expect(decodeMobxstateLayoutComment(encoded)).toEqual({
       version: 1,
       positions: {
@@ -66,6 +68,22 @@ describe("devtools layout metadata", () => {
     expect(metadata?.labelPositions?.["flow.idle:on:START:0"]).toEqual({
       x: 18,
       y: 32,
+    });
+  });
+
+  it("reads legacy base64url layout comments", () => {
+    const legacyPayload = JSON.stringify({
+      version: 1,
+      positions: {
+        "flow.legacy": { x: 44, y: 88 },
+      },
+    });
+    const legacyComment = `/** @mobxstate ${Buffer.from(legacyPayload).toString(
+      "base64url",
+    )} **/`;
+
+    expect(decodeMobxstateLayoutComment(legacyComment)?.positions).toEqual({
+      "flow.legacy": { x: 44, y: 88 },
     });
   });
 

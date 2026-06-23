@@ -1,3 +1,8 @@
+import {
+  compressToEncodedURIComponent,
+  decompressFromEncodedURIComponent,
+} from "lz-string";
+
 import type { SourceRange, SourceTextEdit } from "./sourceReader";
 
 export interface MobxstateLayoutPosition {
@@ -21,7 +26,8 @@ interface LayoutCommentMatch {
   readonly text: string;
 }
 
-const layoutCommentPattern = /\/\*\*\s*@mobxstate\s+([A-Za-z0-9_-]+)\s*\*+\//g;
+const layoutCommentPattern =
+  /\/\*\*\s*@mobxstate\s+([A-Za-z0-9_+$-]+)\s*\*+\//g;
 
 const normalizePosition = (
   position: MobxstateLayoutPosition,
@@ -66,17 +72,6 @@ const normalizeMetadata = (
   };
 };
 
-const encodeBase64Url = (value: string): string => {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-
 const decodeBase64Url = (value: string): string | undefined => {
   try {
     const padded = `${value.replace(/-/g, "+").replace(/_/g, "/")}${"=".repeat(
@@ -89,6 +84,19 @@ const decodeBase64Url = (value: string): string | undefined => {
   } catch {
     return undefined;
   }
+};
+
+const encodeLayoutPayload = (input: MobxstateLayoutMetadataInput): string => {
+  return compressToEncodedURIComponent(JSON.stringify(normalizeMetadata(input)));
+};
+
+const decodeLayoutPayload = (value: string): string | undefined => {
+  const compressed = decompressFromEncodedURIComponent(value);
+  if (compressed) {
+    return compressed;
+  }
+
+  return decodeBase64Url(value);
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -173,7 +181,7 @@ const findInsertIndent = (text: string, insertOffset: number): string => {
 export const encodeMobxstateLayoutComment = (
   input: MobxstateLayoutMetadataInput,
 ): string => {
-  const encoded = encodeBase64Url(JSON.stringify(normalizeMetadata(input)));
+  const encoded = encodeLayoutPayload(input);
   return `/** @mobxstate ${encoded} **/`;
 };
 
@@ -187,7 +195,7 @@ export const decodeMobxstateLayoutComment = (
     return undefined;
   }
 
-  const decoded = decodeBase64Url(encoded);
+  const decoded = decodeLayoutPayload(encoded);
   if (!decoded) {
     return undefined;
   }

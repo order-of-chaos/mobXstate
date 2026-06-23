@@ -121,10 +121,10 @@ class FakeTextDocument {
   }
 }
 
-const createFakeVscode = () => {
+const createFakeVscode = (text = source) => {
   const document = new FakeTextDocument(
     FakeUri.parse("file:///workspace/machine.ts"),
-    source,
+    text,
   );
   const commands = new Map<string, () => Promise<unknown>>();
   const diagnostics = new Map<string, readonly FakeDiagnostic[]>();
@@ -490,6 +490,46 @@ describe("VS Code native devtools adapter", () => {
     });
     expect(panel?.messages[panel.messages.length - 1]).toEqual({
       type: "LAYOUT_SAVED",
+    });
+  });
+
+  it("restores visual editor layout from the source comment after reopening", async () => {
+    const firstHarness = createFakeVscode();
+    createVscodeDevtoolsExtension(firstHarness.api, firstHarness.context);
+
+    await firstHarness.commands.get(vscodeDevtoolsCommandIds.openVisualEditor)?.();
+    const [firstPanel] = firstHarness.panels;
+
+    await firstPanel?.receive({
+      type: "LAYOUT_UPDATED",
+      positions: {
+        "nativeAdapter.idle": { x: 180, y: 120 },
+        "nativeAdapter.loading": { x: 520, y: 220 },
+      },
+      labelPositions: {
+        "nativeAdapter.idle:on:START:0": { x: 318, y: 152 },
+      },
+    });
+
+    const comment = firstHarness.appliedEdits[0]?.replacements[0]?.text.trim();
+    expect(comment).toMatch(/^\/\*\* @mobxstate N4/);
+
+    const sourceWithLayout = source.replace("{\n  id:", `{\n  ${comment}\n  id:`);
+    const secondHarness = createFakeVscode(sourceWithLayout);
+    createVscodeDevtoolsExtension(secondHarness.api, secondHarness.context);
+
+    await secondHarness.commands.get(vscodeDevtoolsCommandIds.openVisualEditor)?.();
+    const payload = secondHarness.panels[0]?.messages[0] as
+      | VscodeDevtoolsPanelPayload
+      | undefined;
+
+    expect(payload?.layout?.positions["nativeAdapter.idle"]).toEqual({
+      x: 180,
+      y: 120,
+    });
+    expect(payload?.layout?.labelPositions?.["nativeAdapter.idle:on:START:0"]).toEqual({
+      x: 318,
+      y: 152,
     });
   });
 });

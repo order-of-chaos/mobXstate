@@ -1,0 +1,44 @@
+{
+  "name": "mobxstate-devtools-vscode",
+  "displayName": "MobXstate Devtools",
+  "description": "VS Code shell for MobXstate viewer, visual editor, diagnostics and typegen.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "orderofchaos",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Visualization", "Other"],
+  "activationEvents": [
+    "onCommand:mobxstate.openViewer",
+    "onCommand:mobxstate.openVisualEditor",
+    "onCommand:mobxstate.generateTypegen",
+    "onCommand:mobxstate.checkCurrentFile",
+    "onCommand:mobxstate.exportMachineConfig"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mobxstate.openViewer",
+        "title": "MobXstate: Open Viewer"
+      },
+      {
+        "command": "mobxstate.openVisualEditor",
+        "title": "MobXstate: Open Visual Editor"
+      },
+      {
+        "command": "mobxstate.generateTypegen",
+        "title": "MobXstate: Generate Typegen"
+      },
+      {
+        "command": "mobxstate.checkCurrentFile",
+        "title": "MobXstate: Check Current File"
+      },
+      {
+        "command": "mobxstate.exportMachineConfig",
+        "title": "MobXstate: Export Machine Config"
+      }
+    ]
+  }
+}

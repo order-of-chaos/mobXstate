@@ -27,6 +27,11 @@ export {
   createDevtoolsWorkerProtocol,
   devtoolsWorkerProtocolVersion,
 } from "./workerProtocol";
+export {
+  createVscodeDevtoolsShell,
+  getVscodeDevtoolsTypegenUri,
+  vscodeDevtoolsCommandIds,
+} from "./vscodeExtensionShell";
 export type {
   DevtoolsDiagnostic,
   DevtoolsDiagnosticCode,
@@ -109,3 +114,15 @@ export type {
   SetDisplayedMachineParams,
   UpdateDocumentParams,
 } from "./workerProtocol";
+export type {
+  VscodeDevtoolsCommandId,
+  VscodeDevtoolsCommandResult,
+  VscodeDevtoolsCommandResultKind,
+  VscodeDevtoolsDiagnostic,
+  VscodeDevtoolsDisposable,
+  VscodeDevtoolsDocument,
+  VscodeDevtoolsHost,
+  VscodeDevtoolsPanelMode,
+  VscodeDevtoolsPanelPayload,
+  VscodeDevtoolsShell,
+} from "./vscodeExtensionShell";

@@ -134,10 +134,13 @@ Definition of Done:
 - source navigation методы для state node и store binding ranges;
 - formatting/export и close document commands;
 - focused tests для worker protocol contract.
+- VS Code shell core для команд, diagnostics, panel payload, typegen write и
+  accepted edits через native host boundary;
+- `extensions/vscode` manifest scaffold с командами extension.
 
 Порядок:
 
-1. VS Code extension.
+1. VS Code native adapter и webview host.
 2. WebStorm plugin shell.
 3. Zed diagnostics/typegen.
 4. Zed visual UI только после стабильной API-возможности.

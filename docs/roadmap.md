@@ -135,6 +135,32 @@ Done when:
 - npm metadata is complete;
 - release docs describe exactly what is supported.
 
+## Phase 6: State Props And Richer Action Meta
+
+Goal: let machines carry static data on states and give actions full local
+context, so user code never has to encode data in state names or read
+observable machine fields mid-macrostep.
+
+- Add `props` to state node config with root-to-leaf merge. Done.
+- Expose merged props of the active configuration:
+  - `snapshot.props`. Done;
+  - observable computed `props` on `MobXStateMachine`. Done;
+  - parallel branches merge in activation order. Done.
+- Enrich `MachineActionMeta` with `state`, `statePath`, `props`, and `kind`
+  (`entry` | `exit` | `transition` | `stop`). Done.
+- Make root final states observable:
+  - public `onDone` callback (same shape as `onStop`). Done;
+  - observable `isDone`, reset on restart. Done;
+  - keep the machine running after the root final — stopping stays an explicit
+    user decision. Done.
+
+Done when:
+
+- actions can tell why they run and what state data they own without parsing
+  state names;
+- UI code can react to `machine.props` like it reacts to `machine.state`;
+- reaching the root final state is observable without comparing state values.
+
 ## Recommended Next Step
 
 Before publishing:

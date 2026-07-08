@@ -6,11 +6,13 @@ import type {
   Machine,
   MachineOptions,
   MachineSendEvent,
+  MachineStateProps,
   MachineStateValue,
   TypegenConstraint,
   TypegenDisabled,
   TypegenMeta,
 } from "./stateMachine";
+import { emptyMachineProps } from "./stateMachine";
 import {
   createMachineActor,
   type MachineActor,
@@ -57,6 +59,10 @@ export interface IMachineState<
   state: MachineStateValue | undefined;
   snapshot: MachineSnapshot<Event> | undefined;
   ready: Promise<MachineActorStatus | undefined>;
+  /** True once the machine root has reached a final state; resets on (re)start. */
+  isDone: boolean;
+  /** Static props of the active configuration, merged root-to-leaf. */
+  readonly props: MachineStateProps;
 
   send(event: MachineSendEvent<Event>): void;
 
@@ -207,6 +213,9 @@ export class MobXStateMachine<
   public ready: Promise<MachineActorStatus | undefined> =
     Promise.resolve(undefined);
 
+  @observable.ref
+  public isDone = false;
+
   private actor: MachineActor<Scope, Event, Typegen> | undefined;
 
   private readonly machineOptions?: MachineOptions<Scope, Event, Typegen>;
@@ -242,14 +251,22 @@ export class MobXStateMachine<
 
   public onStop: () => void = () => undefined;
 
+  /** Called once when the machine root reaches a final state. Override or reassign to react. */
+  public onDone: (event: Event) => void = () => undefined;
+
   protected init = async (
     state?: MachineStateValue,
   ): Promise<MachineActorStatus | undefined> => {
+    this.setDone(false);
+
     const actor = createMachineActor(
       this.machine,
       this.machineOptions,
       this as unknown as Scope,
-      undefined,
+      (event) => {
+        this.setDone(true);
+        this.onDone(event);
+      },
       { strict: this.config?.strict },
     );
     this.actor = actor;
@@ -282,6 +299,11 @@ export class MobXStateMachine<
     return tsMatch<MatchesState<Typegen>>(
       this.state as MatchesState<Typegen>,
     );
+  }
+
+  @computed
+  get props(): MachineStateProps {
+    return this.snapshot?.props ?? emptyMachineProps;
   }
 
   public stopMachine = (): void => {
@@ -359,6 +381,11 @@ export class MobXStateMachine<
     value: Promise<MachineActorStatus | undefined>,
   ): void => {
     this.ready = value;
+  };
+
+  @action
+  private setDone = (value: boolean): void => {
+    this.isDone = value;
   };
 
   @action

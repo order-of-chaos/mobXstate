@@ -4,6 +4,7 @@ import type {
   EventObject,
   Machine,
   MachineAction,
+  MachineActionKind,
   MachineActionObject,
   MachineActionReference,
   MachineCondition,
@@ -15,6 +16,7 @@ import type {
   MachineOptions,
   MachineSendEvent,
   MachineStateNodeConfig,
+  MachineStateProps,
   MachineStateValue,
   MachineTransition,
   MachineTransitionConfig,
@@ -22,6 +24,7 @@ import type {
   TypegenConstraint,
   TypegenDisabled,
 } from "./stateMachine";
+import { emptyMachineProps } from "./stateMachine";
 
 export enum MachineActorStatus {
   NotStarted = 0,
@@ -32,6 +35,8 @@ export enum MachineActorStatus {
 export interface MachineSnapshot<Event extends EventObject> {
   readonly value: MachineStateValue;
   readonly event: Event | undefined;
+  /** Static props of the active configuration, merged root-to-leaf (parallel branches merge in activation order). */
+  readonly props: MachineStateProps;
   matches(state: MachineStateValue): boolean;
 }
 
@@ -66,6 +71,8 @@ interface RuntimeNode<Event extends EventObject> {
   readonly key: string;
   readonly path: string[];
   readonly config: MachineStateNodeConfig<Event>;
+  /** Static props merged along the path: root first, deeper nodes override. */
+  readonly props: MachineStateProps;
   readonly parent: RuntimeNode<Event> | undefined;
   readonly children: Map<string, RuntimeNode<Event>>;
 }
@@ -253,6 +260,19 @@ const toRuntimeOptions = <
   return (value ?? {}) as unknown as RuntimeOptions<Scope, Event>;
 };
 
+const mergeNodeProps = <Event extends EventObject>(
+  parent: RuntimeNode<Event> | undefined,
+  ownProps: Record<string, unknown> | undefined,
+): MachineStateProps => {
+  const parentProps = parent?.props ?? emptyMachineProps;
+
+  if (!ownProps || Object.keys(ownProps).length === 0) {
+    return parentProps;
+  }
+
+  return Object.freeze({ ...parentProps, ...ownProps });
+};
+
 const createNodeTree = <Event extends EventObject>(
   key: string,
   path: string[],
@@ -264,6 +284,7 @@ const createNodeTree = <Event extends EventObject>(
     key,
     path,
     config,
+    props: mergeNodeProps(parent, config.props),
     parent,
     children: new Map(),
   };
@@ -663,9 +684,9 @@ export class MachineActor<
     try {
       this.runMacrostep(() => {
         this.getExitNodes(this.root, []).forEach((node) => {
-          this.exitNode(node, stopEvent);
+          this.exitNode(node, stopEvent, "stop");
         });
-        this.exitNode(this.root, stopEvent);
+        this.exitNode(this.root, stopEvent, "stop");
         this.finishStop();
       });
     } catch (error) {
@@ -923,7 +944,7 @@ export class MachineActor<
         : this.resolveTargetLeafPaths(source, transition.target);
 
     if (transition.target === undefined) {
-      this.executeActions(transition.actions, event);
+      this.executeActions(transition.actions, event, source, "transition");
       return;
     }
 
@@ -939,7 +960,7 @@ export class MachineActor<
     });
 
     this.activePaths = retainedPaths;
-    this.executeActions(transition.actions, event);
+    this.executeActions(transition.actions, event, source, "transition");
     this.activePaths = this.mergeActivePaths([...retainedPaths, ...targets]);
 
     this.getEntryNodes(boundary, targets).forEach((node) => {
@@ -1014,26 +1035,32 @@ export class MachineActor<
   };
 
   private enterNode = (node: RuntimeNode<Event>, event: Event): void => {
-    this.executeActions(node.config.entry, event);
+    this.executeActions(node.config.entry, event, node, "entry");
     this.startInvokes(node, event);
     if (this.status === MachineActorStatus.Running && this.isTransitionSourceActive(node)) {
       this.startDelayedTransitions(node, event);
     }
   };
 
-  private exitNode = (node: RuntimeNode<Event>, event: Event): void => {
+  private exitNode = (
+    node: RuntimeNode<Event>,
+    event: Event,
+    kind: MachineActionKind = "exit",
+  ): void => {
     this.stopNodeEffects(node);
-    this.executeActions(node.config.exit, event);
+    this.executeActions(node.config.exit, event, node, kind);
     this.clearCompletedNodes(node);
   };
 
   private executeActions = (
     value: MachineActionReference | undefined,
     event: Event,
+    node: RuntimeNode<Event>,
+    kind: MachineActionKind,
   ): void => {
     normalizeActionReferences(value).forEach((action) => {
       if (typeof action === "string") {
-        this.executeNamedAction(action, { type: action }, event);
+        this.executeNamedAction(action, { type: action }, event, node, kind);
         return;
       }
 
@@ -1042,7 +1069,7 @@ export class MachineActor<
         return;
       }
 
-      this.executeNamedAction(action.type, action, event);
+      this.executeNamedAction(action.type, action, event, node, kind);
     });
   };
 
@@ -1050,6 +1077,8 @@ export class MachineActor<
     name: string,
     action: MachineActionObject,
     event: Event,
+    node: RuntimeNode<Event>,
+    kind: MachineActionKind,
   ): void => {
     if (!this.scope) {
       return;
@@ -1057,13 +1086,18 @@ export class MachineActor<
 
     const scope = this.scope;
     const storeAction = this.getScopeMember(name);
+    const meta = {
+      action,
+      event,
+      state: node.key,
+      statePath: pathKey(node.path),
+      props: node.props,
+      kind,
+    };
 
     if (isCallable(storeAction)) {
       runInAction(() => {
-        storeAction.call(scope, event, {
-          action,
-          event,
-        });
+        storeAction.call(scope, event, meta);
       });
       return;
     }
@@ -1074,10 +1108,7 @@ export class MachineActor<
     }
 
     runInAction(() => {
-      implementation.call(scope, event, {
-        action,
-        event,
-      });
+      implementation.call(scope, event, meta);
     });
   };
 
@@ -1834,11 +1865,29 @@ export class MachineActor<
     const snapshot: MachineSnapshot<Event> = {
       value,
       event,
+      props: this.activeProps(),
       matches: (state) => matchesStateValue(value, state),
     };
 
     this.snapshot = snapshot;
     this.subscribers.forEach((subscriber) => subscriber(snapshot));
+  };
+
+  private activeProps = (): MachineStateProps => {
+    if (this.activePaths.length === 0) {
+      return this.root.props;
+    }
+
+    if (this.activePaths.length === 1) {
+      return this.getNode(this.activePaths[0]).props;
+    }
+
+    const merged: Record<string, unknown> = {};
+    this.activePaths.forEach((path) => {
+      Object.assign(merged, this.getNode(path).props);
+    });
+
+    return Object.freeze(merged);
   };
 
   private valueFromNode = (node: RuntimeNode<Event>): MachineStateValue => {

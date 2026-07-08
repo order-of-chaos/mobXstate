@@ -24,6 +24,10 @@ export type MachineSendEvent<Event extends EventObject> =
 
 export type MachineStateValue = string | { [key: string]: MachineStateValue };
 
+export type MachineStateProps = Readonly<Record<string, unknown>>;
+
+export const emptyMachineProps: MachineStateProps = Object.freeze({});
+
 export interface TypegenDisabled {
   "@@mobxstate/typegen"?: false;
 }
@@ -73,12 +77,22 @@ export const sendTo = <Event extends EventObject>(
   };
 };
 
+export type MachineActionKind = "entry" | "exit" | "transition" | "stop";
+
 export interface MachineActionMeta<
   Event extends EventObject,
   Action extends MachineActionObject = MachineActionObject,
 > {
   action: Action;
   event: Event;
+  /** Key of the state node this action is declared on (transition actions: the source node). */
+  state: string;
+  /** Dot-joined path of that node from the machine root; empty string for the root itself. */
+  statePath: string;
+  /** Static props merged along the node path (root first, deeper nodes override). */
+  props: MachineStateProps;
+  /** Execution phase; `stop` marks exit actions running because the machine is being stopped. */
+  kind: MachineActionKind;
 }
 
 export interface MachineGuardMeta<Event extends EventObject> {
@@ -165,6 +179,8 @@ export interface MachineStateNodeConfig<Event extends EventObject> {
   initial?: string;
   type?: "atomic" | "compound" | "parallel" | "final" | "history" | string;
   history?: "shallow" | "deep" | boolean;
+  /** Static data attached to this state; visible in action meta and machine props. */
+  props?: Record<string, unknown>;
   states?: Record<string, MachineStateNodeConfig<Event>>;
   on?: Record<string, MachineTransition<Event>>;
   always?: MachineDelayTransition<Event>;

@@ -167,14 +167,36 @@ code {
             }
           }</code></pre>
           <p>Both entrypoints keep the same <code>extends MobXStateMachine&amp;lt;Store, Event&amp;gt;</code> store shape and share the same state machine runtime.</p>
+          <h2>State Props</h2>
+          <p>State nodes can carry static data through <code>props</code>:</p>
+          <pre><code class="language-ts">const machine = createMachine({
+            id: &quot;quest&quot;,
+            props: { music: &quot;calm&quot; },
+            initial: &quot;greeting&quot;,
+            states: {
+              greeting: {
+                props: { dialog: &quot;hello&quot;, music: &quot;menu&quot; },
+                entry: &quot;runDialog&quot;,
+              },
+            },
+          });</code></pre>
+          <ul><li>Props merge along the node path: the root first, deeper nodes override.</li><li>Actions read the owning node's merged props from <code>meta.props</code>.</li><li>The store exposes the merged props of the active configuration as the observable computed <code>props</code> (parallel branches merge in activation order).</li><li>Props are static config data: they are frozen at machine creation and never change at runtime — reactivity comes from the active state changing.</li></ul>
+          <h2>Action Meta</h2>
+          <p>Every named action receives <code>(event, meta)</code> where <code>meta</code> contains:</p>
+          <ul><li><code>action</code> — the resolved action object (<code>{ type }</code> plus any inline fields).</li><li><code>event</code> — the event that triggered the action.</li><li><code>state</code> — the key of the state node the action is declared on (for transition actions: the source node).</li><li><code>statePath</code> — the dot-joined path of that node from the machine root; an empty string for the root itself.</li><li><code>props</code> — the merged static props of that node.</li><li><code>kind</code> — the execution phase: <code>&amp;quot;entry&amp;quot;</code>, <code>&amp;quot;exit&amp;quot;</code>, <code>&amp;quot;transition&amp;quot;</code>, or <code>&amp;quot;stop&amp;quot;</code> for exit actions that run because the machine is being stopped.</li></ul>
+          <p><code>meta</code> is self-contained on purpose: during a macrostep the observable <code>state</code>/<code>snapshot</code> are not updated yet, so actions should read <code>meta</code>, not the store's observable machine fields.</p>
           <h2>Runtime Behavior</h2>
           <ul><li>Named actions resolve to store methods first and run inside <code>runInAction</code>.</li><li>Named guards resolve to store getters, boolean properties, or pure methods.</li><li>Named delays resolve to store number getters, properties, or methods.</li><li>Full macrosteps are batched in one MobX transaction.</li><li><code>invoke: &amp;quot;methodName&amp;quot;</code> starts a store lifecycle effect that may return a promise, cleanup function, child machine, or <code>void</code>.</li><li>Promise rejections and synchronous invoke failures route through <code>onError</code> when possible.</li><li>Action and guard failures are fatal runtime errors and clean up active resources before rethrowing.</li><li>Cleanup failures are reported as <code>MachineCleanupError</code> after all cleanup functions have been attempted.</li></ul>
           <h2>Observable State</h2>
-          <ul><li><code>state</code> is the current observable state value.</li><li><code>snapshot</code> is the latest snapshot with <code>value</code>, <code>event</code>, and <code>matches(...)</code>.</li><li><code>send(event)</code> accepts object events and typed string events without required payload fields.</li><li><code>matches(state)</code> checks the current state.</li><li><code>ready</code> resolves after the internal actor has started.</li></ul>
+          <ul><li><code>state</code> is the current observable state value.</li><li><code>snapshot</code> is the latest snapshot with <code>value</code>, <code>event</code>, <code>props</code>, and <code>matches(...)</code>.</li><li><code>props</code> is the observable computed with the merged static props of the active configuration.</li><li><code>send(event)</code> accepts object events and typed string events without required payload fields.</li><li><code>matches(state)</code> checks the current state.</li><li><code>ready</code> resolves after the internal actor has started.</li></ul>
+          <h2>Root Final State</h2>
+          <p>Reaching a final state at the machine root does not stop the machine: the MobX store keeps living with its data. Instead the machine reports completion:</p>
+          <ul><li><code>isDone</code> is an observable flag set to <code>true</code> once the root reaches a final state; it resets on <code>startMachine</code>/<code>restart</code>.</li><li><code>onDone</code> is a public callback (same shape as <code>onStop</code>) called once per run with the <code>done.invoke.&amp;lt;machineId&amp;gt;</code> event. Override or reassign it to react — for example, call <code>stopMachine()</code> there to get terminate-on-final semantics.</li></ul>
+          <p>Nested final states keep working through <code>onDone</code> transitions on the parent state node, as before.</p>
           <h2>Persistence</h2>
           <ul><li><code>persistentKey</code> stores the current state under <code>MachinesStorage</code>.</li><li>Saved values are validated before restore.</li><li><code>version</code> stores versioned persistence records.</li><li><code>transformPersistedState(state, fromVersion)</code> can normalize persisted values before validation.</li></ul>
           <h2>Feature Support</h2>
-          <ul><li>Supported: <code>entry</code>, <code>exit</code>, named actions, named guards, named delays, numeric delays, <code>after</code>, <code>always</code>, <code>invoke</code>, promise effects, cleanup effects, child machines, nested states, parallel states, final states, shallow history, <code>onDone</code>, <code>onError</code>, typed <code>send</code>, persistence validation, and persistence versioning.</li><li>Removed: <code>MachineOptions.services</code>, <code>MachineOptions.activities</code>, state node <code>activities</code>, and callback invoke services.</li><li>Explicit runtime error: <code>history: &amp;quot;deep&amp;quot;</code>.</li><li>Out of scope: separate XState-style machine <code>context</code> runtime.</li></ul>
+          <ul><li>Supported: <code>entry</code>, <code>exit</code>, named actions, named guards, named delays, numeric delays, <code>after</code>, <code>always</code>, <code>invoke</code>, promise effects, cleanup effects, child machines, nested states, parallel states, final states, root <code>onDone</code>/<code>isDone</code>, state <code>props</code>, action meta (<code>state</code>, <code>statePath</code>, <code>props</code>, <code>kind</code>), shallow history, <code>onDone</code>, <code>onError</code>, typed <code>send</code>, persistence validation, and persistence versioning.</li><li>Removed: <code>MachineOptions.services</code>, <code>MachineOptions.activities</code>, state node <code>activities</code>, and callback invoke services.</li><li>Explicit runtime error: <code>history: &amp;quot;deep&amp;quot;</code>.</li><li>Out of scope: separate machine <code>context</code> runtime.</li></ul>
         </article>
       </main>
       <footer class="footer">
